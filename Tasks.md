@@ -122,3 +122,13 @@ curl --location --request POST 'https://www.runninghub.cn/task/openapi/outputs' 
 当msg的值是success的时候，代表任务执行成功，解析fileUrl的内容，并调用requests下载到slides/{num}.mp4,并删除slides/{num}.task
 当msg的值是APIKEY_TASK_IS_RUNNING的时候,代表任务还在执行，继续等待。
 如果msg出现其他值，代表任务失败了，则再执行一次，超过3次程序停止
+
+@batch_process_pdf.py @batch_process_ppt.py @batch_process_slides.py 参考这三个程序的代码。
+我希望创建一个main.py程序，完成以下任务：
+1、首先向用户提问，是否需要清空slides和output中的所有文件，如果是的话就清除，如果回答否则不做处理。
+2、处理input中的第一个pdf，参考@batch_process_pdf.py
+3、处理input中的这个pdf同名的ppt或者pptx,参考@batch_process_ppt.py
+4、生成silde的video，参考@test_gen_video.py
+5、批量处理slides，参考@batch_process_slides.py
+我还希望上面的5个步骤可以通过参数单独执行
+还有一个上传数字人的操作，参考@batch_process_upload.py,这个操作只能通过参数单独执行
