@@ -17,14 +17,15 @@ load_dotenv()
 class RunningHubAPI:
     """RunningHub API客户端"""
 
-    def __init__(self, base_url: str = "https://www.runninghub.cn"):
+    def __init__(self, api_key: str = None, base_url: str = "https://www.runninghub.cn"):
         """
         初始化API客户端
 
         Args:
+            api_key: API密钥，如果为None则从环境变量获取
             base_url: API基础URL
         """
-        self.api_key = get_api_key()
+        self.api_key = api_key if api_key else get_api_key()
         self.base_url = base_url
         self.upload_url = f"{base_url}/task/openapi/upload"
         self.generate_url = f"{base_url}/task/openapi/ai-app/run"

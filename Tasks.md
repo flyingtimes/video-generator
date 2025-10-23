@@ -132,3 +132,93 @@ curl --location --request POST 'https://www.runninghub.cn/task/openapi/outputs' 
 5、批量处理slides，参考@batch_process_slides.py
 我还希望上面的5个步骤可以通过参数单独执行
 还有一个上传数字人的操作，参考@batch_process_upload.py,这个操作只能通过参数单独执行
+
+
+创建lib\gamma_api.py实现下述功能：
+根据用户给出的input/prompt.txt文件的内容，调用下面的接口生成pptx
+下面是接口的示例文档
+```
+import requests
+
+url = "https://public-api.gamma.app/v0.2/generations"
+
+payload = {
+    "inputText": "string",
+    "textMode": "generate",
+    "format": "presentation",
+    "themeName": "企业汇报模版",
+    "numCards": 10,
+    "cardSplit": "auto",
+    "additionalInstructions": "Make the titles catchy",
+    "exportAs": "pptx",
+    "textOptions": {
+        "amount": "brief",
+        "tone": "professional",
+        "audience": "college students",
+        "language": "zh-cn"
+    },
+    "imageOptions": {
+        "source": "aiGenerated",
+        "model": "",
+        "style": "插画风格"
+    },
+    "cardOptions": { "dimensions": "16*9" },
+    "sharingOptions": {
+        "workspaceAccess": "string",
+        "externalAccess": "string"
+    }
+}
+headers = {
+    "accept": "application/json",
+    "Content-Type": "application/json",
+    "X-API-KEY": "you gamma api key"
+}
+
+response = requests.post(url, json=payload, headers=headers)
+
+print(response.text)
+```
+其中inputText是prompts.txt的内容，X-API_KEY从.env环境文件读取
+@main.py 添加一个可以通过参数单独调用的功能，使用lib\gamma_api.py生成pptx。
+
+
+@lib\gamma_api.py generate_pptx函数会获得接口的返回值，里面有个generationId代表待下载的pptx文件的id，返回值示例如下：
+```
+{
+  "generationId": "xxxxxxxxxxx"
+}
+```
+通过以下接口调用可以获得这个任务当前的状态：
+```
+import requests
+
+url = "https://public-api.gamma.app/v0.2/generations"
+
+headers = {
+    "accept": "application/json",
+    "Content-Type": "application/json",
+    "X-API-KEY": "123"
+}
+
+response = requests.post(url, headers=headers)
+
+print(response.text)
+```
+返回的内容格式如下：
+```
+{
+  "generationId": "XXXXXXXXXXX",
+  "status": "completed",
+  "gammaUrl": "https://gamma.app/docs/yyyyyyyyyy",
+  "credits": {
+    "deducted": 150,
+    "remaining": 3000
+  }
+}
+```
+@lib\gamma_api.py 每30秒调用一次这个接口获取状态，如果status是completed，那么就使用requests从gammaUrl中下载这个pptx到input/文件夹中
+
+@input\prompt.txt @lib\gamma_api.py _download_file函数在下载完pptx以后，在下载完的pptx文件中添加备注文字。备注文字中的内容来自于prompt.txt中的内容。prompt.txt文件中用"\n---\n"分隔每一页的内容，请解析并将内容分别插入每一页pptx中
+```
+
+```

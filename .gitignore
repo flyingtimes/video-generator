@@ -98,6 +98,7 @@ MANIFEST
 output/
 slides/
 input/
+demo/
 # Virtual environments
 venv/
 env/

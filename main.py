@@ -29,6 +29,7 @@ from lib.slide_add_head_to_video import (
     merge_videos
 )
 from lib.runninghub_api import get_api_key
+from lib.gamma_api import generate_pptx_from_prompt
 
 
 def clear_directories():
@@ -287,6 +288,54 @@ def batch_process_slides():
         return False
 
 
+def generate_pptx(num_cards: int = 6):
+    """根据提示词文件生成PPTX文件"""
+    print("🔄 生成PPTX文件")
+    print("-" * 40)
+
+    try:
+        # 检查提示词文件是否存在
+        prompt_file = "input/prompt.txt"
+        if not Path(prompt_file).exists():
+            print(f"❌ 提示词文件不存在: {prompt_file}")
+            print("请在input目录下创建prompt.txt文件并添加您要生成PPT的提示词内容")
+            return False
+
+        print(f"📖 读取提示词文件: {prompt_file}")
+        print(f"📄 设置幻灯片数量: {num_cards}")
+
+        # 生成PPTX
+        result = generate_pptx_from_prompt(
+            prompt_file=prompt_file,
+            output_dir="input",
+            themeName="企业汇报模版",
+            numCards=num_cards,
+            additionalInstructions="创建一个专业的演示文稿，包含清晰的标题和结构化的内容",
+            textOptions={
+                "amount": "brief",
+                "tone": "professional",
+                "audience": "general",
+                "language": "zh-cn"
+            },
+            imageOptions={
+                "source": "aiGenerated",
+                "style": "现代简约"
+            },
+            cardOptions={"dimensions": "16x9"}
+        )
+
+        if result:
+            print(f"✅ PPTX文件生成成功: {result}")
+            return True
+        else:
+            print("❌ PPTX文件生成失败")
+            return False
+
+    except Exception as e:
+        print(f"❌ PPTX生成过程中发生错误: {str(e)}")
+        return False
+
+
 def upload_digital_human(character_name: str = "man"):
     """上传数字人文件"""
     print(f"🔄 数字人上传: {character_name}")
@@ -384,6 +433,8 @@ def main():
   %(prog)s --batch                  # 仅批量处理slides
   %(prog)s --upload man             # 上传指定数字人
   %(prog)s --upload all             # 批量上传所有数字人
+  %(prog)s --create-ppt             # 生成PPTX（默认6张幻灯片）
+  %(prog)s --create-ppt 8           # 生成PPTX（8张幻灯片）
         """
     )
 
@@ -393,6 +444,8 @@ def main():
     parser.add_argument("--generate", action="store_true", help="仅生成slide视频")
     parser.add_argument("--batch", action="store_true", help="仅批量处理slides")
     parser.add_argument("--upload", metavar="NAME", help="上传指定数字人 (如: man, woman, all)")
+    parser.add_argument("--create-ppt", nargs='?', const=6, type=int, metavar="NUM_CARDS",
+                       help="根据提示词文件生成PPTX (默认生成6张幻灯片，可指定数量)")
 
     args = parser.parse_args()
 
@@ -407,7 +460,7 @@ def main():
         return generate_slide_videos()
     elif args.batch:
         return batch_process_slides()
-    elif args.upload:
+    elif args.upload is not None:
         if args.upload.lower() == "all":
             # 批量上传所有数字人
             characters_dir = Path("characters")
@@ -429,6 +482,9 @@ def main():
                 return False
         else:
             return upload_digital_human(args.upload)
+    elif args.create_ppt is not None:
+        # args.create_ppt 默认为6，用户可以指定数值
+        return generate_pptx(args.create_ppt)
     else:
         # 没有指定参数，运行完整工作流程
         return run_complete_workflow()
