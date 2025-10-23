@@ -97,6 +97,7 @@ wheels/
 MANIFEST
 output/
 slides/
+input/
 # Virtual environments
 venv/
 env/
