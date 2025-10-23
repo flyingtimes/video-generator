@@ -1,1 +1,3 @@
-# 
+在input目录下存在着同名的pdf和pptx/ppt文件两个文件
+从pptx/ppt格式的文件中截取每一页的备注，并生成包含备注内容的txt文件，放到slides文件夹中，如果文件夹中已经有相应的文件存在，覆盖它。例如：slides/1.txt,slides/2.txt,...
+将以上python代码写成程序lib/ppt_to_txt.py,并在本路径下创建batch_process_ppt.py来测试功能
