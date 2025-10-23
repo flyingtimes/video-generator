@@ -164,6 +164,7 @@ def check_and_create_directories():
 def find_slide_pairs() -> List[Tuple[int, str, str]]:
     """
     查找slides目录下所有有效的图片-视频对
+    如果存在png文件但缺少mp4文件，会检查output目录是否已有combine_{num}.mp4
 
     Returns:
         List[Tuple[int, str, str]]: 包含(编号, png文件, mp4文件)的列表
@@ -183,12 +184,18 @@ def find_slide_pairs() -> List[Tuple[int, str, str]]:
         if base_name.isdigit():
             num = int(base_name)
             mp4_file = f"slides/{num}.mp4"
+            output_file = f"output/combine_{num}.mp4"
 
             # 检查对应的mp4文件是否存在
             if Path(mp4_file).exists():
                 pairs.append((num, png_file, mp4_file))
             else:
-                print(f"⚠️  跳过 {base_name}.png: 缺少对应的 {base_name}.mp4 文件")
+                # 如果mp4文件不存在，检查output目录是否已有combine_{num}.mp4
+                if Path(output_file).exists():
+                    print(f"✅ {base_name}.png: 缺少对应的 {base_name}.mp4 文件，但已存在合并结果 {output_file}")
+                    pairs.append((num, png_file, mp4_file))
+                else:
+                    print(f"⚠️  跳过 {base_name}.png: 缺少对应的 {base_name}.mp4 文件，且未找到合并结果")
 
     # 按数字排序
     pairs.sort(key=lambda x: x[0])
@@ -223,6 +230,11 @@ def process_slide_pairs(pairs: List[Tuple[int, str, str]]) -> List[str]:
         if Path(output_file).exists():
             print(f"⏭️  combine_{num}.mp4 已存在，跳过")
             processed_files.append(output_file)
+            continue
+
+        # 检查对应的mp4文件是否存在
+        if not Path(mp4_file).exists():
+            print(f"⚠️  跳过第 {num} 组: 缺少对应的 {num}.mp4 文件")
             continue
 
         print(f"🎬 处理第 {num} 组: {png_file} + {mp4_file}")

@@ -383,6 +383,19 @@ class RunningHubAPI:
             if not text:
                 print(f"⚠️ 幻灯片文本文件为空，跳过此幻灯片: {slide_text_file}")
                 return "skip"
+
+            # 检查是否是[full]开头的文本
+            is_full_mode = text.startswith('[full]')
+            if is_full_mode:
+                # 移除[full]前缀
+                text = text[5:].strip()
+                print(f"📄 检测到[full]模式，使用landscape模式生成视频")
+                # 修改输出路径为output/combine_{num}.mp4
+                output_video = f"output/combine_{slide_num}.mp4"
+                # 确保output目录存在
+                os.makedirs("output", exist_ok=True)
+                print(f"📁 输出路径: {output_video}")
+
             print(f"📄 已读取文本内容: {text[:50]}{'...' if len(text) > 50 else ''}")
         except Exception as e:
             print(f"❌ 读取文本文件失败: {str(e)}")
@@ -407,20 +420,22 @@ class RunningHubAPI:
                 print(f"❌ 读取任务文件失败: {str(e)}")
                 return False
         else:
-            # 上传图片文件
-            print(f"正在上传幻灯片图片: {slide_image}")
-            uploaded_image = self.upload_file(slide_image)
-            if not uploaded_image:
-                print(f"❌ 上传幻灯片图片失败")
-                return False
-
-            # 生成短视频任务
-            task_id = self.gen_short_Video(
-                short_image=character_config['short_id'],
-                reference_audio=character_config['voice_id'],
-                text=text,
-                mode="short"
-            )
+            # 根据模式选择合适的视频生成方式，直接使用配置文件中的ID
+            if is_full_mode:
+                print(f"使用landscape模式生成视频")
+                task_id = self.gen_short_Video(
+                    short_image=character_config['landscape_id'],
+                    reference_audio=character_config['voice_id'],
+                    text=text,
+                    mode="landscape"
+                )
+            else:
+                task_id = self.gen_short_Video(
+                    short_image=character_config['short_id'],
+                    reference_audio=character_config['voice_id'],
+                    text=text,
+                    mode="short"
+                )
 
             if not task_id:
                 print("❌ 生成短视频任务失败")
@@ -445,7 +460,7 @@ class RunningHubAPI:
 
             for attempt in range(max_attempts):
                 print(f"⏳ 等待任务完成... ({attempt + 1}/{max_attempts})")
-                time.sleep(10)  # 等待10秒
+                time.sleep(30)  # 等待10秒
 
                 status_result = self.check_task_status(task_id)
                 if not status_result:
@@ -454,7 +469,7 @@ class RunningHubAPI:
 
                 code = status_result.get('code', -1)
                 msg = status_result.get('msg', '')
-                print(f"📊 任务状态: {msg} (code: {code})")
+                print(f"⏳  ({attempt + 1}/{max_attempts})，📊 任务状态: {msg}{code}")
 
                 if code == 0 and msg == 'success':
                     # 任务成功，获取下载链接
@@ -503,20 +518,22 @@ class RunningHubAPI:
                 except:
                     pass
 
-                # 重新上传图片并生成任务
-                print(f"正在重新上传图片...")
-                uploaded_image = self.upload_file(slide_image)
-                if not uploaded_image:
-                    print(f"❌ 重新上传幻灯片图片失败")
-                    return False
-
                 print(f"正在重新生成任务...")
-                task_id = self.gen_short_Video(
-                    short_image=uploaded_image,
-                    reference_audio=character_config['voice_id'],
-                    text=text,
-                    mode="short"
-                )
+                # 根据模式选择合适的视频生成方式，直接使用配置文件中的ID
+                if is_full_mode:
+                    task_id = self.gen_short_Video(
+                        short_image=character_config['landscape_id'],
+                        reference_audio=character_config['voice_id'],
+                        text=text,
+                        mode="landscape"
+                    )
+                else:
+                    task_id = self.gen_short_Video(
+                        short_image=character_config['short_id'],
+                        reference_audio=character_config['voice_id'],
+                        text=text,
+                        mode="short"
+                    )
 
                 if task_id:
                     # 保存新的任务ID
