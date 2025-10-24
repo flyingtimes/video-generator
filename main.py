@@ -15,6 +15,8 @@ import argparse
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "lib"))
 
+from lib.logger import get_logger, execution_time_logger, step_logger
+
 from lib.pdf_to_png import (
     create_directories,
     find_pdf_files,
@@ -32,6 +34,8 @@ from lib.runninghub_api import get_api_key
 from lib.gamma_api import generate_pptx_from_prompt
 
 
+@execution_time_logger("清空目录")
+@step_logger("清空slides和output目录")
 def clear_directories():
     """清空slides和output目录中的所有文件"""
     slides_dir = Path("slides")
@@ -77,6 +81,8 @@ def clear_directories():
     return True
 
 
+@execution_time_logger("处理PDF文件")
+@step_logger("处理PDF文件")
 def process_pdf():
     """处理input目录中的第一个PDF文件"""
     print("🔄 步骤2: 处理PDF文件")
@@ -112,6 +118,8 @@ def process_pdf():
         return False
 
 
+@execution_time_logger("处理PPT备注")
+@step_logger("处理PPT备注提取")
 def process_ppt():
     """处理与PDF同名的PPT/PPTX文件"""
     print("🔄 步骤3: 处理PPT备注提取")
@@ -153,6 +161,8 @@ def process_ppt():
         return False
 
 
+@execution_time_logger("生成slide视频")
+@step_logger("生成slide视频")
 def generate_slide_videos():
     """生成每个slide的视频"""
     print("🔄 步骤4: 生成slide视频")
@@ -244,6 +254,8 @@ def generate_slide_videos():
         return False
 
 
+@execution_time_logger("批量处理slides")
+@step_logger("批量处理slides文件")
 def batch_process_slides():
     """批量处理slides目录中的文件"""
     print("🔄 步骤5: 批量处理slides文件")
@@ -367,6 +379,8 @@ def upload_digital_human(character_name: str = "man"):
         return False
 
 
+@execution_time_logger("完整工作流程")
+@step_logger("完整视频生成工作流程")
 def run_complete_workflow():
     """运行完整的工作流程"""
     print("🚀 开始完整视频生成工作流程")
@@ -418,6 +432,7 @@ def run_complete_workflow():
     return True
 
 
+@execution_time_logger("主程序执行")
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(

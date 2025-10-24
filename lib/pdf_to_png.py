@@ -10,14 +10,21 @@ import fitz  # PyMuPDF
 from pathlib import Path
 from typing import List, Tuple, Optional
 from PIL import Image
+from lib.logger import get_logger, execution_time_logger, step_logger
 
 
 def create_directories():
     """创建必要的目录"""
-    os.makedirs("slides", exist_ok=True)
-    os.makedirs("input", exist_ok=True)
+    logger = get_logger()
+
+    for dir_name in ["slides", "input"]:
+        if os.makedirs(dir_name, exist_ok=True):
+            logger.debug(f"创建目录: {dir_name}")
+        else:
+            logger.debug(f"目录已存在: {dir_name}")
 
 
+@execution_time_logger("查找PDF文件")
 def find_pdf_files() -> List[str]:
     """
     查找input目录下所有PDF文件
@@ -25,14 +32,17 @@ def find_pdf_files() -> List[str]:
     Returns:
         List[str]: PDF文件路径列表
     """
+    logger = get_logger()
+
     input_dir = Path("input")
     if not input_dir.exists():
-        print(f"❌ input目录不存在: {input_dir}")
+        logger.error(f"input目录不存在: {input_dir}")
         return []
 
     pdf_files = list(input_dir.glob("*.pdf"))
     pdf_files.sort()  # 按文件名排序
 
+    logger.debug(f"在input目录中找到 {len(pdf_files)} 个PDF文件: {[f.name for f in pdf_files]}")
     return [str(f) for f in pdf_files]
 
 
@@ -54,6 +64,8 @@ def calculate_scale_and_crop(page_width: int, page_height: int, target_width: in
     Returns:
         Tuple[float, Tuple[int, int, int, int]]: (缩放比例, (裁剪x, 裁剪y, 裁剪宽度, 裁剪高度))
     """
+    logger = get_logger()
+
     # 计算原始和目标的比例
     original_ratio = page_width / page_height
     target_ratio = target_width / target_height
@@ -62,9 +74,9 @@ def calculate_scale_and_crop(page_width: int, page_height: int, target_width: in
     width_ratio = page_width / target_width
     height_ratio = page_height / target_height
 
-    print(f"📐 原始尺寸: {page_width}×{page_height} (比例: {original_ratio:.2f})")
-    print(f"🎯 目标尺寸: {target_width}×{target_height} (比例: {target_ratio:.2f})")
-    print(f"📊 尺寸比例: 宽度{width_ratio:.2f}x, 高度{height_ratio:.2f}x")
+    logger.debug(f"原始尺寸: {page_width}×{page_height} (比例: {original_ratio:.2f})")
+    logger.debug(f"目标尺寸: {target_width}×{target_height} (比例: {target_ratio:.2f})")
+    logger.debug(f"尺寸比例: 宽度{width_ratio:.2f}x, 高度{height_ratio:.2f}x")
 
     # 情况1：原图小于目标尺寸 - 放大到覆盖目标尺寸，然后居中裁剪
     if width_ratio < 1.0 and height_ratio < 1.0:
@@ -78,9 +90,9 @@ def calculate_scale_and_crop(page_width: int, page_height: int, target_width: in
         crop_x = (scaled_width - target_width) // 2
         crop_y = (scaled_height - target_height) // 2
 
-        print(f"🔍 策略1: 原图较小，放大后居中裁剪 ({scale:.2f}x)")
-        print(f"📏 放大尺寸: {scaled_width}×{scaled_height}")
-        print(f"✂️ 裁剪区域: ({crop_x}, {crop_y}, {target_width}, {target_height})")
+        logger.debug(f"策略1: 原图较小，放大后居中裁剪 ({scale:.2f}x)")
+        logger.debug(f"放大尺寸: {scaled_width}×{scaled_height}")
+        logger.debug(f"裁剪区域: ({crop_x}, {crop_y}, {target_width}, {target_height})")
 
         return scale, (crop_x, crop_y, target_width, target_height)
 
@@ -95,7 +107,7 @@ def calculate_scale_and_crop(page_width: int, page_height: int, target_width: in
         crop_x = (scaled_width - target_width) // 2
         crop_y = (scaled_height - target_height) // 2
 
-        print(f"🔍 策略2: 尺寸相近，最小缩放精准裁剪 ({scale:.2f}x)")
+        logger.debug(f"策略2: 尺寸相近，最小缩放精准裁剪 ({scale:.2f}x)")
 
         return scale, (crop_x, crop_y, target_width, target_height)
 
@@ -137,6 +149,7 @@ def calculate_scale_and_crop(page_width: int, page_height: int, target_width: in
         return scale, (crop_x, crop_y, final_crop_width, final_crop_height)
 
 
+@execution_time_logger("PDF页面转PNG")
 def pdf_page_to_png(pdf_path: str, page_num: int, output_path: str, target_size: Tuple[int, int] = (1920, 1080), dpi: int = 300) -> bool:
     """
     将PDF的指定页面转换为PNG图片，使用智能内容感知裁剪算法
@@ -152,6 +165,8 @@ def pdf_page_to_png(pdf_path: str, page_num: int, output_path: str, target_size:
         bool: 转换是否成功
     """
     try:
+        logger = get_logger()
+
         # 打开PDF文件
         doc = fitz.open(pdf_path)
 
@@ -163,6 +178,8 @@ def pdf_page_to_png(pdf_path: str, page_num: int, output_path: str, target_size:
         page_width = int(rect.width)
         page_height = int(rect.height)
 
+        logger.debug(f"处理页面 {page_num + 1}, 原始尺寸: {page_width}×{page_height}")
+
         # 渲染页面为图像
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 提高渲染质量
 
@@ -170,7 +187,7 @@ def pdf_page_to_png(pdf_path: str, page_num: int, output_path: str, target_size:
         img_data = pix.tobytes("png")
         img = Image.open(io.BytesIO(img_data))
 
-        print(f"📏 原始渲染图像尺寸: {img.size}")
+        logger.debug(f"原始渲染图像尺寸: {img.size}")
 
         # 计算缩放和裁剪参数
         scale, crop_params = calculate_scale_and_crop(img.width, img.height, target_size[0], target_size[1])
@@ -234,6 +251,8 @@ def pdf_page_to_png(pdf_path: str, page_num: int, output_path: str, target_size:
         return False
 
 
+@execution_time_logger("PDF转slides")
+@step_logger("处理PDF文件")
 def process_pdf_to_slides(pdf_path: str, target_size: Tuple[int, int] = (1920, 1080)) -> List[str]:
     """
     将PDF文件的所有页面转换为PNG图片并保存到slides文件夹
@@ -274,6 +293,8 @@ def process_pdf_to_slides(pdf_path: str, target_size: Tuple[int, int] = (1920, 1
         return []
 
 
+@execution_time_logger("批量处理PDF文件")
+@step_logger("批量处理PDF文件")
 def batch_process_pdfs(target_size: Tuple[int, int] = (1920, 1080)) -> bool:
     """
     批量处理input目录下的所有PDF文件

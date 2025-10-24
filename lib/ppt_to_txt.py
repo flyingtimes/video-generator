@@ -12,6 +12,8 @@ from typing import List, Optional
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from lib.logger import get_logger, execution_time_logger, step_logger
+
 try:
     from pptx import Presentation
 except ImportError:
@@ -19,6 +21,8 @@ except ImportError:
     sys.exit(1)
 
 
+@execution_time_logger("提取PPT备注")
+@step_logger("处理PPT备注提取")
 def extract_notes_from_pptx(pptx_path: str, output_dir: str) -> bool:
     """
     从PPTX文件中提取备注并保存到txt文件
@@ -31,6 +35,8 @@ def extract_notes_from_pptx(pptx_path: str, output_dir: str) -> bool:
         bool: 是否成功提取
     """
     try:
+        logger = get_logger()
+
         # 确保输出目录存在
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -38,8 +44,8 @@ def extract_notes_from_pptx(pptx_path: str, output_dir: str) -> bool:
         # 加载演示文稿
         prs = Presentation(pptx_path)
 
-        print(f"正在处理文件: {pptx_path}")
-        print(f"总页数: {len(prs.slides)}")
+        logger.debug(f"正在处理文件: {pptx_path}")
+        logger.debug(f"总页数: {len(prs.slides)}")
 
         extracted_count = 0
 
@@ -81,6 +87,7 @@ def extract_notes_from_pptx(pptx_path: str, output_dir: str) -> bool:
         return False
 
 
+@execution_time_logger("查找PPT文件")
 def find_pptx_file(input_dir: str, base_name: str) -> Optional[str]:
     """
     在输入目录中查找PPTX/PPT文件

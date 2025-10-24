@@ -6,12 +6,14 @@ RunningHub API文件上传工具
 import os
 import json
 import requests
+import time
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
+from lib.logger import get_logger, execution_time_logger
 
 
 class RunningHubAPI:
@@ -25,11 +27,14 @@ class RunningHubAPI:
             api_key: API密钥，如果为None则从环境变量获取
             base_url: API基础URL
         """
+        self.logger = get_logger()
         self.api_key = api_key if api_key else get_api_key()
         self.base_url = base_url
         self.upload_url = f"{base_url}/task/openapi/upload"
         self.generate_url = f"{base_url}/task/openapi/ai-app/run"
         self.status_url = f"{base_url}/task/openapi/outputs"
+
+        self.logger.debug(f"初始化RunningHub API客户端，base_url: {base_url}")
 
     def upload_file(self, file_path: str, file_type: str = "input") -> Optional[str]:
         """
