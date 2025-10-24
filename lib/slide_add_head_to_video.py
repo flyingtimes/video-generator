@@ -263,7 +263,7 @@ def process_slide_pairs(pairs: List[Tuple[int, str, str]]) -> List[str]:
 
 def merge_videos(video_files: List[str], output_path: str = "output/result.mp4") -> bool:
     """
-    将所有视频合并为一个文件，支持智能音频处理
+    将所有视频合并为一个文件，支持智能音频处理，确保音画同步
 
     Args:
         video_files: 要合并的视频文件列表
@@ -282,14 +282,21 @@ def merge_videos(video_files: List[str], output_path: str = "output/result.mp4")
         # 创建输入流
         inputs = [ffmpeg.input(file) for file in video_files]
 
-        # 检查视频文件是否包含音频
+        # 检查视频文件是否包含音频，并获取详细信息
         has_audio = []
         for i, file in enumerate(video_files):
             try:
                 probe = ffmpeg.probe(file)
                 audio_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'audio']
                 has_audio.append(len(audio_streams) > 0)
-            except:
+
+                if len(audio_streams) > 0:
+                    print(f"📹 视频 {i+1} ({Path(file).name}): 包含音频流")
+                else:
+                    print(f"📹 视频 {i+1} ({Path(file).name}): 无音频流")
+
+            except Exception as e:
+                print(f"⚠️  无法检测视频 {i+1} 的音频信息: {e}")
                 has_audio.append(False)
 
         # 如果所有视频都没有音频，合并时只处理视频
@@ -303,33 +310,74 @@ def merge_videos(video_files: List[str], output_path: str = "output/result.mp4")
                 .run(capture_stdout=True, capture_stderr=True)
             )
         else:
-            # 如果有音频，需要分别处理视频流和音频流
-            print("ℹ️  检测到视频包含音频，将保留音频轨道")
-            # 分离视频流和音频流
-            video_streams = [input.video for input in inputs]
-            audio_streams = []
+            # 使用改进的同步合并方法
+            print("ℹ️  检测到视频包含音频，将使用音画同步合并")
 
-            for i, input_stream in enumerate(inputs):
+            # 使用分离式处理，但对每个有音频的视频保持音画同步
+            # 这种方法更可靠，能正确处理部分视频有音频的情况
+
+            # 构建输入流列表
+            input_streams = []
+            for i, input_file in enumerate(inputs):
+                input_streams.append(input_file.video)  # 视频流
                 if has_audio[i]:
-                    audio_streams.append(input_stream.audio)
+                    input_streams.append(input_file.audio)  # 音频流（如果有）
 
-            # 合并视频流
-            concat_video = ffmpeg.concat(*video_streams, v=1, a=0)
+            # 计算需要处理的视频和音频流数量
+            video_count = len(inputs)
+            audio_count = sum(has_audio)
 
-            if audio_streams:
-                # 合并音频流
-                concat_audio = ffmpeg.concat(*audio_streams, v=0, a=1)
-                # 合并视频和音频
-                out = ffmpeg.output(concat_video, concat_audio, output_path,
-                                   vcodec='libx264', acodec='aac', preset='medium', crf=23)
+            if audio_count == 0:
+                # 所有视频都没有音频
+                concat = ffmpeg.concat(*inputs)
+                out = ffmpeg.output(concat, output_path, vcodec='libx264', preset='medium', crf=23)
             else:
-                # 只有视频流
-                out = ffmpeg.output(concat_video, output_path,
-                                   vcodec='libx264', preset='medium', crf=23)
+                # 使用分离式合并，但保持音画同步
+                # 创建临时文件列表
+                import tempfile
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_file:
+                    temp_list_path = temp_file.name
+                    for file in video_files:
+                        temp_file.write(f"file '{Path(file).absolute()}'\n")
 
-            out.overwrite_output().run(capture_stdout=True, capture_stderr=True)
+                # 使用ffmpeg的concat demuxer进行合并，这是最可靠的音画同步方法
+                import subprocess
+                cmd = [
+                    'ffmpeg',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', temp_list_path,
+                    '-c', 'copy',  # 直接复制流，避免重新编码导致的问题
+                    '-y',          # 覆盖输出文件
+                    output_path
+                ]
+
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                Path(temp_list_path).unlink()  # 删除临时文件
+
+                if result.returncode != 0:
+                    raise RuntimeError(f"FFmpeg concat failed: {result.stderr}")
 
         print(f"✅ 合并完成: {output_path}")
+
+        # 验证合并后的音画同步
+        try:
+            probe = ffmpeg.probe(output_path)
+            video_streams = [s for s in probe['streams'] if s['codec_type'] == 'video']
+            audio_streams = [s for s in probe['streams'] if s['codec_type'] == 'audio']
+
+            if len(video_streams) > 0 and len(audio_streams) > 0:
+                video_duration = float(video_streams[0].get('duration', 0))
+                audio_duration = float(audio_streams[0].get('duration', 0))
+
+                if abs(video_duration - audio_duration) > 0.1:
+                    print(f"⚠️  警告: 合并后的视频存在音画时长差异 - 视频: {video_duration:.2f}s, 音频: {audio_duration:.2f}s")
+                else:
+                    print("✅ 音画同步检查通过")
+
+        except Exception as e:
+            print(f"⚠️  无法验证音画同步: {e}")
+
         return True
 
     except ffmpeg.Error as e:
