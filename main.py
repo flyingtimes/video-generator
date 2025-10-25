@@ -163,7 +163,7 @@ def process_ppt():
 
 @execution_time_logger("生成slide视频")
 @step_logger("生成slide视频")
-def generate_slide_videos():
+def generate_slide_videos(digital_human: str = "man"):
     """生成每个slide的视频"""
     print("🔄 步骤4: 生成slide视频")
     print("-" * 40)
@@ -174,7 +174,6 @@ def generate_slide_videos():
         print("✅ 成功创建API客户端")
 
         # 数字人选择
-        digital_human = "man"
         print(f"🎭 使用数字人: {digital_human}")
 
         success_count = 0
@@ -381,7 +380,7 @@ def upload_digital_human(character_name: str = "man"):
 
 @execution_time_logger("完整工作流程")
 @step_logger("完整视频生成工作流程")
-def run_complete_workflow():
+def run_complete_workflow(digital_human: str = "man"):
     """运行完整的工作流程"""
     print("🚀 开始完整视频生成工作流程")
     print("=" * 60)
@@ -411,7 +410,7 @@ def run_complete_workflow():
     steps = [
         ("处理PDF文件", process_pdf),
         ("处理PPT备注", process_ppt),
-        ("生成slide视频", generate_slide_videos),
+        ("生成slide视频", lambda: generate_slide_videos(digital_human)),
         ("批量处理slides", batch_process_slides)
     ]
 
@@ -440,11 +439,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
-  %(prog)s                          # 运行完整工作流程
+  %(prog)s                          # 运行完整工作流程（使用默认数字人 man）
+  %(prog)s --digital-human woman    # 运行完整工作流程（使用 woman 数字人）
   %(prog)s --clear                  # 仅清空slides和output目录
   %(prog)s --pdf                    # 仅处理PDF文件
   %(prog)s --ppt                    # 仅处理PPT备注提取
   %(prog)s --generate               # 仅生成slide视频
+  %(prog)s --generate --digital-human woman  # 仅生成slide视频（使用 woman 数字人）
   %(prog)s --batch                  # 仅批量处理slides
   %(prog)s --upload man             # 上传指定数字人
   %(prog)s --upload all             # 批量上传所有数字人
@@ -459,6 +460,8 @@ def main():
     parser.add_argument("--generate", action="store_true", help="仅生成slide视频")
     parser.add_argument("--batch", action="store_true", help="仅批量处理slides")
     parser.add_argument("--upload", metavar="NAME", help="上传指定数字人 (如: man, woman, all)")
+    parser.add_argument("--digital-human", metavar="NAME", default="man",
+                       help="指定使用的数字人 (默认: man)")
     parser.add_argument("--create-ppt", nargs='?', const=6, type=int, metavar="NUM_CARDS",
                        help="根据提示词文件生成PPTX (默认生成6张幻灯片，可指定数量)")
 
@@ -472,7 +475,7 @@ def main():
     elif args.ppt:
         return process_ppt()
     elif args.generate:
-        return generate_slide_videos()
+        return generate_slide_videos(args.digital_human)
     elif args.batch:
         return batch_process_slides()
     elif args.upload is not None:
@@ -502,7 +505,7 @@ def main():
         return generate_pptx(args.create_ppt)
     else:
         # 没有指定参数，运行完整工作流程
-        return run_complete_workflow()
+        return run_complete_workflow(args.digital_human)
 
 
 if __name__ == "__main__":

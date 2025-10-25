@@ -134,13 +134,17 @@ uv run python main.py
 
 #### 完整工作流程
 ```bash
+# 使用默认数字人 (man)
 uv run python main.py
+
+# 指定使用特定数字人
+uv run python main.py --digital-human woman
 ```
 **执行步骤**：
 1. 🗑️ 可选择清空slides和output目录
 2. 📄 处理input目录中的PDF文件
 3. 📝 提取PPT备注内容
-4. 🤖 生成数字人视频
+4. 🤖 生成数字人视频（使用指定的数字人）
 5. 🎬 合成最终视频
 
 #### 分步执行选项
@@ -168,11 +172,16 @@ uv run python main.py --ppt
 
 **🤖 生成数字人视频**
 ```bash
+# 使用默认数字人 (man)
 uv run python main.py --generate
+
+# 指定使用特定数字人
+uv run python main.py --generate --digital-human woman
 ```
 - 为每个slide生成数字人讲解视频
 - 支持跳过已存在的视频文件
 - 自动处理重试和错误恢复
+- 可通过`--digital-human`参数指定数字人（默认：man）
 
 **🎬 合成最终视频**
 ```bash
@@ -188,6 +197,20 @@ uv run python main.py --upload man
 
 # 批量上传所有数字人
 uv run python main.py --upload all
+
+# 生成视频时指定数字人
+uv run python main.py --digital-human woman
+```
+
+**🎭 数字人选择**
+```bash
+# 查看帮助信息
+uv run python main.py --help
+
+# 使用不同的数字人
+uv run python main.py --digital-human man      # 使用男性数字人（默认）
+uv run python main.py --digital-human woman    # 使用女性数字人
+uv run python main.py --digital-human custom   # 使用自定义数字人
 ```
 
 ### 📋 实用工作流程示例
@@ -200,27 +223,41 @@ uv run python main.py --pdf            # 处理PDF
 uv run python main.py --ppt            # 提取备注
 
 # 生成阶段
-uv run python main.py --generate       # 生成数字人视频
+uv run python main.py --generate       # 生成数字人视频（使用默认数字人）
 
 # 合成阶段
 uv run python main.py --batch          # 合成最终视频
 ```
 
+#### 🎭 使用不同数字人的流程
+```bash
+# 使用女性数字人制作视频
+uv run python main.py --digital-human woman
+
+# 或者分步执行
+uv run python main.py --clear
+uv run python main.py --pdf
+uv run python main.py --ppt
+uv run python main.py --generate --digital-human woman
+uv run python main.py --batch
+```
+
 #### 🔄 快速重新生成
 ```bash
 # 仅重新生成视频（不重新处理PDF/PPT）
-uv run python main.py --generate
+uv run python main.py --generate                    # 使用默认数字人
+uv run python main.py --generate --digital-human woman  # 使用指定数字人
 uv run python main.py --batch
 ```
 
 #### 🎨 使用自动生成的PPT
 ```bash
 # 从prompt.txt自动生成PPT
-uv run python main.py --gamma
+uv run python main.py --create-ppt
 
 # 然后继续正常流程
 uv run python main.py --pdf
-uv run python main.py --generate
+uv run python main.py --generate --digital-human woman  # 指定数字人
 uv run python main.py --batch
 ```
 
@@ -426,7 +463,13 @@ A: 建议单页内容控制在1-3分钟，整个视频建议不超过30分钟。
 A: 默认输出1920x1080高清视频。
 
 **Q: 可以自定义数字人形象吗？**
-A: 可以通过`characters/`目录添加自定义数字人配置。
+A: 可以通过`characters/`目录添加自定义数字人配置，然后使用`--digital-human custom`参数调用。
+
+**Q: 如何指定使用哪个数字人？**
+A: 使用`--digital-human`参数指定数字人名称，例如：`--digital-human woman`。
+
+**Q: 支持哪些数字人类型？**
+A: 支持通过`characters/`目录配置的任何数字人，常见的有man、woman等，也可以添加自定义数字人。
 
 **Q: 如何处理网络中断？**
 A: 程序支持自动重试机制，网络恢复后会继续处理。
