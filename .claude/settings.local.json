@@ -11,7 +11,11 @@
       "Bash(find:*)",
       "Bash(git add:*)",
       "Bash(uv sync:*)",
-      "mcp__txt2voice_server__txt2voice"
+      "mcp__txt2voice_server__txt2voice",
+      "Bash(uv run python:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   },
