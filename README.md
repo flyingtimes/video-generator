@@ -13,6 +13,7 @@
 - 🤖 **数字人视频生成**: 集成RunningHub API生成数字人讲解视频
 - 🎞️ **视频合成**: 将幻灯片与数字人视频完美合成
 - 🎨 **PPT自动生成**: 通过Gamma API根据提示词自动生成演示文稿
+- 🎮 **Web管理界面**: 可视化数字人管理器，支持批量上传、预览和配置
 - 🔄 **灵活工作流**: 支持完整流程或分步执行
 - 📊 **详细日志**: 完善的日志记录和错误处理机制
 
@@ -213,6 +214,18 @@ uv run python main.py --digital-human woman    # 使用女性数字人
 uv run python main.py --digital-human custom   # 使用自定义数字人
 ```
 
+**🎮 数字人Web管理器**
+```bash
+# 启动数字人管理Web界面
+uv run digital-human-web-manager.py
+```
+- 🌐 在浏览器中访问 `http://localhost:7860`
+- 📊 可视化管理所有数字人资源
+- 📤 批量上传数字人到服务器
+- 👁️ 预览数字人的图片和音频文件
+- ⚙️ 查看和管理数字人配置信息
+- ➕ 通过Web界面创建新数字人
+
 ### 📋 实用工作流程示例
 
 #### 🎬 标准视频制作流程
@@ -319,6 +332,8 @@ video-generator/
 ├── 📁 logs/               # 日志文件目录
 ├── 📁 test/               # 测试文件目录
 ├── 📄 main.py             # 主程序入口
+├── 📄 digital-human-web-manager.py  # 数字人Web管理器
+├── 📄 manifest.json       # Web应用清单文件
 ├── 📄 .env                # 环境变量配置
 ├── 📄 .mcp.json           # MCP服务配置
 ├── 📄 pyproject.toml      # 项目依赖配置
@@ -331,6 +346,11 @@ video-generator/
 - 协调各个功能模块
 - 提供命令行接口
 - 处理工作流程编排
+
+#### 🎮 `digital-human-web-manager.py` - 数字人Web管理器
+- 提供可视化的数字人管理界面
+- 支持批量上传、预览和配置管理
+- 集成Gradio框架，操作简单直观
 
 #### 📚 `lib/` - 功能库
 - **`pdf_to_png.py`**: PDF文档处理和图片转换
@@ -349,6 +369,7 @@ video-generator/
   - `python-pptx`: PowerPoint文件操作
   - `ffmpeg-python`: 视频处理
   - `Pillow`: 图像处理
+  - `gradio`: Web界面框架
   - `requests`: HTTP请求
   - `python-dotenv`: 环境变量管理
 
