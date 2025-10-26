@@ -375,6 +375,102 @@ video-generator/
 
 ## 🎮 工作流程详解
 
+### 🔄 RunningHub工作流程编排
+
+以下是完整的视频生成工作流程，从PDF文档到最终视频的详细处理过程：
+
+```mermaid
+flowchart TD
+    A[📁 准备输入文件] --> B{选择工作模式}
+
+    B -->|完整流程| C[🗑️ 清理工作目录]
+    B -->|分步执行| D[📄 处理PDF文档]
+
+    C --> D
+    D --> E{存在PPT/PPTX文件?}
+
+    E -->|是| F[📝 提取PPT备注]
+    E -->|否| G[📋 使用prompt.txt内容]
+
+    F --> H[✅ 验证文本内容]
+    G --> H
+
+    H --> I[🎯 选择数字人]
+    I --> J[🤖 调用RunningHub API]
+
+    J --> K{API调用成功?}
+    K -->|失败| L[🔄 重试机制]
+    L --> J
+    K -->|成功| M[💾 保存数字人视频]
+
+    M --> N[🔍 检查完整性]
+    N --> O{所有slides都处理完成?}
+
+    O -->|否| P[⏭️ 跳过已存在视频]
+    P --> J
+    O -->|是| Q[🎬 视频合成处理]
+
+    Q --> R[📸 合成幻灯片+数字人]
+    R --> S[🔗 合并所有视频片段]
+    S --> T[📹 生成最终视频]
+
+    T --> U[✅ 输出到output/result.mp4]
+
+    %% 并行处理流程
+    J -.-> V[👥 批量处理多个slides]
+    V --> W[⚡ 并行API调用]
+    W --> M
+
+    %% 错误处理分支
+    L -.-> X{重试次数超限?}
+    X -->|是| Y[❌ 记录失败任务]
+    X -->|否| J
+    Y --> Z[📝 生成错误报告]
+    Z --> AA[🔍 手动检查]
+    AA --> M
+
+    %% 质量检查
+    U --> BB[🔍 质量验证]
+    BB --> CC{视频质量达标?}
+    CC -->|否| DD[🔧 参数调整]
+    DD --> I
+    CC -->|是| EE[🎉 任务完成]
+
+    %% 样式定义
+    classDef inputStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef processStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef apiStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
+    classDef outputStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef errorStyle fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef successStyle fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+
+    class A,G inputStyle
+    class C,D,F,H,I,Q,R,S processStyle
+    class J,L,W apiStyle
+    class M,T,U,BB outputStyle
+    class X,Y,Z,AA errorStyle
+    class EE successStyle
+```
+
+### 📊 工作流程特性说明
+
+**🔄 智能处理机制**
+- **跳过已存在**: 自动检测已生成的视频，避免重复处理
+- **错误恢复**: 失败任务自动重试，支持多次尝试
+- **并行处理**: 支持多个slides同时生成，提高效率
+- **质量验证**: 输出前进行质量检查，确保视频质量
+
+**📝 输入输出规范**
+- **输入**: PDF文档、PPT备注文件、文本脚本
+- **中间文件**: PNG图片序列、文本文件、数字人视频片段
+- **输出**: 1920x1080高清MP4视频文件
+
+**⚡ 性能优化**
+- **缓存机制**: 智能缓存已处理的内容
+- **并发处理**: 支持多任务并行执行
+- **资源管理**: 合理管理系统资源使用
+- **进度追踪**: 实时显示处理进度
+
 ### 第1步：🗑️ 环境准备（可选）
 - 询问用户是否清空工作目录
 - 清理slides和output中的旧文件
