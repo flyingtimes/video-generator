@@ -1,0 +1,20 @@
+line: cs-cnbd
+limit: 1
+streamers:
+  ..\output\resu*.mp4:
+    copyright: 1
+    source: 转载来源
+    tid: 171 # 投稿分区
+    cover: "" # 视频封面
+    title: 未来投资方向深度报告：凯茜·伍德（Cathie Wood）的颠覆性创新洞察
+    desc_format_id: 0
+    desc: huanyuan-world-mirror
+    dolby: 1 # 杜比音效
+    lossless_music: 1 # Hi-Res
+    dynamic: ""
+    subtitle:
+      open: 0
+      lan: ""
+    tag: "海外投资"
+    dtime: ~
+    open_subtitle: false

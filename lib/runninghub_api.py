@@ -315,8 +315,8 @@ class RunningHubAPI:
         """
         import time
 
-        max_retries = 3
-        retry_interval = 15  # 秒
+        max_retries = 10
+        retry_interval = 30  # 秒
 
         for attempt in range(max_retries):
             try:

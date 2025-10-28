@@ -226,6 +226,18 @@ uv run digital-human-web-manager.py
 - ⚙️ 查看和管理数字人配置信息
 - ➕ 通过Web界面创建新数字人
 
+**📺 B站视频上传**
+```bash
+# 使用biliup上传视频到B站
+.\biliup\biliup_win.exe upload -c ..\assets\biliconfig.yaml
+```
+- 📹 自动上传output目录中的视频文件
+- ⚙️ 使用配置文件设置视频参数
+- 🏷️ 自动添加标题、简介、标签等信息
+- 🎵 支持杜比音效和Hi-Res音频
+- 📱 指定投稿分区和封面
+- 🔄 支持批量上传多个视频文件
+
 ### 📋 实用工作流程示例
 
 #### 🎬 标准视频制作流程
@@ -274,6 +286,25 @@ uv run python main.py --generate --digital-human woman  # 指定数字人
 uv run python main.py --batch
 ```
 
+#### 📺 完整视频制作与发布流程
+```bash
+# 1. 视频制作阶段
+uv run python main.py --digital-human woman  # 完整制作流程
+
+# 2. 视频上传阶段
+.\biliup\biliup_win.exe upload -c ..\assets\biliconfig.yaml
+```
+
+#### 🔄 批量制作与上传流程
+```bash
+# 制作多个视频
+uv run python main.py --digital-human man
+uv run python main.py --digital-human woman
+
+# 批量上传到B站
+.\biliup\biliup_win.exe upload -c ..\assets\biliconfig.yaml
+```
+
 ### 📁 文件准备指南
 
 #### 输入文件结构
@@ -318,6 +349,10 @@ video-generator/
 │   └── 1.mp4, 2.mp4...    # 生成的数字人视频
 ├── 📁 output/             # 最终输出目录
 │   └── result.mp4         # 合成的完整视频
+├── 📁 biliup/             # B站上传工具目录
+│   ├── biliup_win.exe     # Windows版B站上传工具
+│   ├── biliup_macos       # macOS版B站上传工具
+│   └── cookies.json       # B站登录凭证文件
 ├── 📁 characters/         # 数字人配置目录
 ├── 📁 lib/                # 核心功能模块
 │   ├── pdf_to_png.py      # PDF转图片处理
@@ -328,7 +363,8 @@ video-generator/
 │   └── logger.py          # 日志记录模块
 ├── 📁 tools/              # 工具脚本目录
 ├── 📁 assets/             # 资源文件
-│   └── prompt.txt         # 讲稿示例
+│   ├── prompt.txt         # 讲稿示例
+│   └── biliconfig.yaml    # B站上传配置文件
 ├── 📁 logs/               # 日志文件目录
 ├── 📁 test/               # 测试文件目录
 ├── 📄 main.py             # 主程序入口
@@ -596,6 +632,18 @@ A: 目前仅支持处理input目录中的第一个PDF文件。
 
 **Q: 生成的视频有水印吗？**
 A: 水印取决于所使用的API服务提供商的政策。
+
+**Q: 如何使用biliup上传视频？**
+A: 使用命令 `.\biliup\biliup_win.exe upload -c ..\assets\biliconfig.yaml` 即可上传视频到B站。
+
+**Q: biliup支持哪些平台？**
+A: 目前支持Windows（biliup_win.exe）和macOS（biliup_macos）两个平台。
+
+**Q: 如何配置biliup的上传参数？**
+A: 编辑 `assets/biliconfig.yaml` 文件，可以设置视频标题、简介、标签、分区等信息。
+
+**Q: biliup需要登录吗？**
+A: 是的，需要先登录B站账号，登录凭证会保存在 `biliup/cookies.json` 文件中。
 
 ## 🚨 性能优化建议
 

@@ -8,6 +8,7 @@ import os
 import requests
 import json
 import time
+import platform
 from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
@@ -168,6 +169,54 @@ class GammaAPI:
             print(f"❌ 添加备注时发生错误: {str(e)}")
             return False
 
+    def _ppt_to_pdf(self, input_path: str, output_path: str) -> bool:
+        """
+        将PPTX文件转换为PDF文件（仅支持Windows系统）
+
+        Args:
+            input_path: PPTX文件路径
+            output_path: PDF输出路径
+
+        Returns:
+            转换是否成功
+        """
+        try:
+            # 仅在Windows系统下运行
+            if platform.system() != "Windows":
+                print("⚠️ PPT转PDF功能仅在Windows系统下可用")
+                return False
+
+            import win32com.client
+            
+            print(f"🔄 开始转换PPTX为PDF: {input_path} -> {output_path}")
+            
+            # 启动WPS应用
+            wps = win32com.client.Dispatch("Kwpp.Application")
+            
+            try:
+                # 打开演示文稿
+                presentation = wps.Presentations.Open(input_path, WithWindow=False)
+                
+                # 保存为PDF格式（32表示PDF格式）
+                presentation.SaveAs(output_path, 32)
+                
+                # 关闭演示文稿
+                presentation.Close()
+                
+                print(f"✅ PPTX已成功转换为PDF: {output_path}")
+                return True
+                
+            finally:
+                # 确保WPS应用退出
+                wps.Quit()
+                
+        except ImportError:
+            print("❌ 缺少win32com模块，请安装pywin32：pip install pywin32")
+            return False
+        except Exception as e:
+            print(f"❌ PPT转PDF过程中发生错误: {str(e)}")
+            return False
+
     def _prepare_generation_payload(self, input_text: str, **kwargs) -> Dict[str, Any]:
         """
         准备生成PPT的请求载荷
@@ -245,6 +294,29 @@ class GammaAPI:
                     print("✅ 备注添加完成")
                 else:
                     print("⚠️ 备注添加失败，但文件下载成功")
+
+                # 如果在Windows系统下，将PPTX转换为PDF
+                if platform.system() == "Windows":
+                    print("🔄 检测到Windows系统，开始转换PPTX为PDF...")
+                    try:
+                        # 获取绝对路径
+                        pptx_abs_path = os.path.abspath(output_path)
+                        
+                        # 生成PDF文件路径（相同目录，扩展名改为.pdf）
+                        pdf_path = output_path.replace('.pptx', '.pdf')
+                        pdf_abs_path = os.path.abspath(pdf_path)
+                        
+                        # 确保PDF输出目录存在
+                        pdf_dir = os.path.dirname(pdf_abs_path)
+                        os.makedirs(pdf_dir, exist_ok=True)
+                        
+                        # 使用内置方法转换PPTX为PDF
+                        success = self._ppt_to_pdf(pptx_abs_path, pdf_abs_path)
+                        if not success:
+                            print("⚠️ PDF转换失败，但PPTX文件下载成功")
+                        
+                    except Exception as pdf_error:
+                        print(f"⚠️ PDF转换过程中发生错误: {str(pdf_error)}")
 
             return True
         except Exception as e:
