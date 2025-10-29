@@ -471,6 +471,36 @@ def prepare_title_and_cover_and_content():
             print(f"❌ 保存标题文件时发生错误: {str(e)}")
             return False
 
+        # 更新 biliconfig.yaml 文件中的 title 和 desc 字段
+        print("🔄 正在更新 biliconfig.yaml 配置文件...")
+        try:
+            config_file = Path("assets/biliconfig.yaml")
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_content = f.read()
+
+                # 简单的字符串替换来更新 title 和 desc 字段
+                lines = config_content.split('\n')
+                updated_lines = []
+
+                for line in lines:
+                    if line.startswith('title:'):
+                        updated_lines.append(f'title: {title}')
+                    elif line.startswith('desc:'):
+                        updated_lines.append(f'desc: {title}')
+                    else:
+                        updated_lines.append(line)
+
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    f.write('\n'.join(updated_lines))
+
+                print(f"✅ biliconfig.yaml 文件已更新，标题: {title}")
+            else:
+                print(f"⚠️ biliconfig.yaml 文件不存在: {config_file}")
+        except Exception as e:
+            print(f"⚠️ 更新 biliconfig.yaml 文件时发生错误: {str(e)}")
+            # 不返回 False，因为这不是关键错误
+
         # 创建封面图片
         cover_path = Path("input/cover.jpg")
         if cover_path.exists():
