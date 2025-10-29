@@ -32,6 +32,7 @@ from lib.slide_add_head_to_video import (
 )
 from lib.runninghub_api import get_api_key
 from lib.gamma_api import generate_pptx_from_prompt
+from lib.glm_api import talk_to_ai
 
 
 @execution_time_logger("清空目录")
@@ -121,30 +122,41 @@ def process_pdf():
 @execution_time_logger("处理PPT备注")
 @step_logger("处理PPT备注提取")
 def process_ppt():
-    """处理与PDF同名的PPT/PPTX文件"""
+    """处理PPT/PPTX文件的备注"""
     print("🔄 步骤3: 处理PPT备注提取")
     print("-" * 40)
 
-    # 查找PDF文件获取基础名称
     input_path = Path("input")
+    pptx_file = None
+
+    # 首先尝试查找与PDF同名的PPTX文件
     pdf_files = list(input_path.glob("*.pdf"))
+    if pdf_files:
+        base_name = pdf_files[0].stem
+        print(f"📋 首先查找与PDF同名的PPT文件: {base_name}")
+        pptx_file = find_pptx_file("input", base_name)
 
-    if not pdf_files:
-        print("❌ 在input目录下没有找到PDF文件")
-        return False
+    # 如果没找到同名的PPTX文件，尝试查找生成的PPTX文件
+    if not pptx_file:
+        print("📋 未找到同名PPT文件，尝试查找生成的PPTX文件")
+        generated_pptx = input_path / "generated.pptx"
+        if generated_pptx.exists():
+            pptx_file = str(generated_pptx)
+            print(f"📄 找到生成的PPT文件: {generated_pptx.name}")
 
-    # 使用第一个PDF的基础名称
-    base_name = pdf_files[0].stem
-    print(f"📋 查找与 {base_name} 同名的PPT文件")
-
-    # 查找对应的PPTX/PPT文件
-    pptx_file = find_pptx_file("input", base_name)
+    # 如果仍然没找到，尝试查找任何PPTX文件
+    if not pptx_file:
+        print("📋 查找任何可用的PPTX文件")
+        pptx_files = list(input_path.glob("*.pptx")) + list(input_path.glob("*.ppt"))
+        if pptx_files:
+            pptx_file = str(pptx_files[0])
+            print(f"📄 找到PPT文件: {pptx_files[0].name}")
 
     if not pptx_file:
-        print(f"❌ 未找到与 {base_name} 对应的PPTX/PPT文件")
+        print("❌ 在input目录下没有找到任何PPTX/PPT文件")
         return False
 
-    print(f"📄 找到匹配的PPT文件: {os.path.basename(pptx_file)}")
+    print(f"📄 将使用PPT文件: {os.path.basename(pptx_file)}")
 
     # 处理PPT文件
     try:
@@ -299,21 +311,59 @@ def batch_process_slides():
         return False
 
 
-def generate_pptx(num_cards: int = 6):
+def count_pages_from_scripts():
+    """从scripts.txt文件中计算页数"""
+    scripts_file = Path("input/scripts.txt")
+
+    if not scripts_file.exists():
+        print(f"❌ 讲稿文件不存在: {scripts_file}")
+        print("请先使用 --prepare 参数生成讲稿文件")
+        return 0
+
+    try:
+        with open(scripts_file, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+
+        if not content:
+            print(f"❌ 讲稿文件为空: {scripts_file}")
+            return 0
+
+        # 使用"---"分隔符计算页数
+        pages = content.split('---')
+        # 过滤掉空页面
+        pages = [page.strip() for page in pages if page.strip()]
+        page_count = len(pages)
+
+        print(f"📄 从讲稿文件中计算出页数: {page_count} 页")
+        return page_count
+
+    except Exception as e:
+        print(f"❌ 读取讲稿文件时发生错误: {str(e)}")
+        return 0
+
+
+def generate_pptx():
     """根据提示词文件生成PPTX文件"""
     print("🔄 生成PPTX文件")
     print("-" * 40)
 
     try:
+        # 从scripts.txt文件计算页数
+        num_cards = count_pages_from_scripts()
+
+        if num_cards == 0:
+            print("❌ 无法获取页数，请先运行 --prepare 生成讲稿文件")
+            return False
+
         # 检查提示词文件是否存在
         prompt_file = "input/prompt.txt"
         if not Path(prompt_file).exists():
             print(f"❌ 提示词文件不存在: {prompt_file}")
-            print("请在input目录下创建prompt.txt文件并添加您要生成PPT的提示词内容")
+            print("请先使用 --prepare 参数生成提示词文件")
             return False
 
         print(f"📖 读取提示词文件: {prompt_file}")
-        print(f"📄 设置幻灯片数量: {num_cards}")
+        print(f"📄 自动计算幻灯片数量: {num_cards}")
 
         # 生成PPTX
         result = generate_pptx_from_prompt(
@@ -328,6 +378,11 @@ def generate_pptx(num_cards: int = 6):
                 "audience": "general",
                 "language": "zh-cn"
             },
+            imageOptions={
+                "source": "aiGenerated",
+                "model": "imagen-3-pro",
+                "style": "现实风格"
+            },
             cardOptions={"dimensions": "16x9"}
         )
 
@@ -341,6 +396,427 @@ def generate_pptx(num_cards: int = 6):
     except Exception as e:
         print(f"❌ PPTX生成过程中发生错误: {str(e)}")
         return False
+
+
+
+
+@execution_time_logger("准备标题、封面和内容")
+@step_logger("准备标题、封面和内容")
+def prepare_title_and_cover_and_content():
+    """准备标题、封面和内容：生成标题、创建封面图片、拆分内容并生成讲稿"""
+    print("🔄 准备标题、封面和内容")
+    print("-" * 40)
+
+    try:
+        # 检查必要文件是否存在
+        essay_file = Path("input/essay.txt")
+        prompt_file = Path("assets/gen_title_prompt.prompt")
+
+        if not essay_file.exists():
+            print(f"❌ 文章文件不存在: {essay_file}")
+            print("请在input目录下创建essay.txt文件并添加文章内容")
+            return False
+
+        if not prompt_file.exists():
+            print(f"❌ 提示词文件不存在: {prompt_file}")
+            return False
+
+        # 读取文章内容
+        print(f"📖 读取文章文件: {essay_file}")
+        with open(essay_file, 'r', encoding='utf-8') as f:
+            essay_content = f.read().strip()
+
+        if not essay_content:
+            print(f"❌ 文章文件为空: {essay_file}")
+            return False
+
+        print(f"📄 文章内容长度: {len(essay_content)} 字符")
+
+        # 计算中文字符数量并确定页数
+        import re
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', essay_content)
+        chinese_char_count = len(chinese_chars)
+
+        # 根据中文字符数计算页数（每500字一页，向上取整）
+        import math
+        page = math.ceil(chinese_char_count / 400) if chinese_char_count > 0 else 1
+
+        print(f"📊 中文字符数量: {chinese_char_count} 个")
+        print(f"📄 自动计算页数: {page} 页")
+
+        # 调用GLM API生成标题
+        print("🤖 正在生成标题...")
+        try:
+            title = talk_to_ai(str(prompt_file), essay_content)
+
+            if not title:
+                print("❌ 标题生成失败，返回空内容")
+                return False
+
+            # 清理标题内容（去除多余的空白字符）
+            title = title.strip()
+            print(f"✅ 标题生成成功: {title}")
+
+        except Exception as e:
+            print(f"❌ 调用GLM API生成标题时发生错误: {str(e)}")
+            return False
+
+        # 保存标题到文件
+        title_file = Path("input/title.txt")
+        try:
+            with open(title_file, 'w', encoding='utf-8') as f:
+                f.write(title)
+            print(f"✅ 标题已保存到: {title_file}")
+        except Exception as e:
+            print(f"❌ 保存标题文件时发生错误: {str(e)}")
+            return False
+
+        # 创建封面图片
+        cover_path = Path("input/cover.jpg")
+        if cover_path.exists():
+            print("✅ 封面图片已存在，跳过创建")
+            print(f"📁 使用现有封面: {cover_path}")
+        else:
+            print("🎨 正在创建封面图片...")
+            try:
+                api = RunningHubAPI()
+                cover_success = api.create_cover(title)
+
+                if not cover_success:
+                    print("❌ 封面创建失败")
+                    return False
+
+                print("✅ 封面创建成功")
+            except Exception as e:
+                print(f"❌ 创建封面时发生错误: {str(e)}")
+                return False
+
+        # 第3步：拆分内容
+        print(f"📝 正在拆分内容为 {page} 页...")
+        try:
+            split_prompt_file = Path("assets/split_content.prompt")
+            if not split_prompt_file.exists():
+                print(f"❌ 内容拆分提示词文件不存在: {split_prompt_file}")
+                return False
+
+            # 读取拆分提示词并替换页数参数
+            with open(split_prompt_file, 'r', encoding='utf-8') as f:
+                split_prompt = f.read().strip()
+
+            # 将页数参数填入提示词
+            split_prompt = split_prompt.replace("{page}", str(page))
+            # 调用GLM API拆分内容
+            split_content = talk_to_ai(split_prompt, essay_content, model="GLM-4.5-Flash", is_content=True)
+
+            if not split_content:
+                print("❌ 内容拆分失败，返回空内容")
+                return False
+
+            split_content = split_content.strip()
+            print(f"✅ 内容拆分成功，长度: {len(split_content)} 字符")
+
+        except Exception as e:
+            print(f"❌ 拆分内容时发生错误: {str(e)}")
+            return False
+
+        # 保存拆分后的内容
+        prompt_file = Path("input/prompt.txt")
+        try:
+            with open(prompt_file, 'w', encoding='utf-8') as f:
+                f.write(split_content)
+            print(f"✅ 拆分内容已保存到: {prompt_file}")
+        except Exception as e:
+            print(f"❌ 保存拆分内容时发生错误: {str(e)}")
+            return False
+
+        # 第4步：生成讲稿
+        print("📜 正在生成讲稿（使用GLM-4.6模型）...")
+        try:
+            scripts_prompt_file = Path("assets/gen_scripts.prompt")
+            if not scripts_prompt_file.exists():
+                print(f"❌ 讲稿生成提示词文件不存在: {scripts_prompt_file}")
+                return False
+
+            # 使用GLM-4.6模型生成讲稿
+            scripts_content = talk_to_ai(str(scripts_prompt_file), split_content, model="GLM-4.6")
+
+            if not scripts_content:
+                print("❌ 讲稿生成失败，返回空内容")
+                return False
+
+            scripts_content = scripts_content.strip()
+            print(f"✅ 讲稿生成成功，长度: {len(scripts_content)} 字符")
+
+        except Exception as e:
+            print(f"❌ 生成讲稿时发生错误: {str(e)}")
+            return False
+
+        # 保存讲稿内容
+        scripts_file = Path("input/scripts.txt")
+        try:
+            with open(scripts_file, 'w', encoding='utf-8') as f:
+                f.write(scripts_content)
+            print(f"✅ 讲稿已保存到: {scripts_file}")
+        except Exception as e:
+            print(f"❌ 保存讲稿时发生错误: {str(e)}")
+            return False
+
+        print("🎉 所有任务完成！")
+        print("📋 已生成：标题、封面、拆分内容和讲稿")
+        return True
+
+    except Exception as e:
+        print(f"❌ 准备过程中发生错误: {str(e)}")
+        return False
+
+
+def clear_input_directory_except_essay():
+    """清空input目录中除essay.txt外的所有文件"""
+    input_dir = Path("input")
+    if not input_dir.exists():
+        print("📁 input目录不存在，跳过")
+        return True
+
+    files_to_keep = {"essay.txt"}
+    files_found = list(input_dir.glob("*"))
+
+    if not files_found:
+        print("📁 input目录已经是空的")
+        return True
+
+    files_to_delete = [f for f in files_found if f.name not in files_to_keep]
+
+    if not files_to_delete:
+        print("📁 input目录中没有需要删除的文件")
+        return True
+
+    print(f"🗑️  准备删除input目录中的 {len(files_to_delete)} 个文件（保留essay.txt）...")
+
+    for file in files_to_delete:
+        try:
+            if file.is_file():
+                file.unlink()
+            elif file.is_dir():
+                shutil.rmtree(file)
+        except Exception as e:
+            print(f"⚠️ 删除文件失败: {file} - {str(e)}")
+
+    print("✅ input目录清理完成")
+    return True
+
+
+def check_os_and_pdf_status():
+    """检查操作系统和PDF文件状态"""
+    import platform
+    current_os = platform.system().lower()
+
+    print(f"🖥️ 当前操作系统: {current_os}")
+
+    if current_os == "darwin":  # macOS
+        print("🍎 检测到macOS系统")
+
+        # 检查是否已有PDF文件
+        input_dir = Path("input")
+        pdf_files = list(input_dir.glob("*.pdf")) if input_dir.exists() else []
+
+        if pdf_files:
+            print(f"📄 发现PDF文件: {', '.join([f.name for f in pdf_files])}")
+            return True, current_os
+        else:
+            print("❓ 未发现PDF文件")
+            while True:
+                try:
+                    answer = input("你是否已经手动创建了PDF文件? (y/n): ").lower().strip()
+                    if answer in ['y', 'yes', '是']:
+                        return True, current_os
+                    elif answer in ['n', 'no', '否']:
+                        return False, current_os
+                    else:
+                        print("请输入 y/yes/是 或 n/no/否")
+                except KeyboardInterrupt:
+                    print("\n\n操作已取消")
+                    return False, current_os
+    else:
+        print(f"💻 检测到 {current_os} 系统")
+        return True, current_os
+
+
+def upload_video_to_bilibili():
+    """上传视频到B站"""
+    print("📺 开始上传视频到B站")
+    print("-" * 40)
+
+    try:
+        import platform
+        current_os = platform.system().lower()
+
+        # 根据操作系统选择biliup可执行文件
+        if current_os == "windows":
+            biliup_exe = Path("biliup/biliup_win.exe")
+        elif current_os == "darwin":
+            biliup_exe = Path("biliup/biliup_macos")
+        else:
+            print(f"❌ 不支持的操作系统: {current_os}")
+            return False
+
+        config_file = Path("assets/biliconfig.yaml")
+
+        if not biliup_exe.exists():
+            print(f"❌ biliup可执行文件不存在: {biliup_exe}")
+            return False
+
+        if not config_file.exists():
+            print(f"❌ biliup配置文件不存在: {config_file}")
+            return False
+
+        # 构建上传命令
+        upload_cmd = [str(biliup_exe), "upload", "-c", str(config_file)]
+
+        print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
+        print("⏳ 上传过程可能需要较长时间，请耐心等待...")
+
+        # 执行上传命令
+        result = subprocess.run(upload_cmd, cwd=project_root, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            print("✅ 视频上传成功！")
+            if result.stdout:
+                print("📋 上传输出:")
+                print(result.stdout)
+            return True
+        else:
+            print("❌ 视频上传失败")
+            if result.stderr:
+                print("❌ 错误信息:")
+                print(result.stderr)
+            return False
+
+    except Exception as e:
+        print(f"❌ 上传过程中发生错误: {str(e)}")
+        return False
+
+
+@execution_time_logger("完整自动化流程")
+@step_logger("完整自动化流程")
+def run_full_workflow(digital_human: str = "man"):
+    """运行完整的自动化流程"""
+    print("🚀 开始完整自动化流程")
+    print("=" * 60)
+
+    # 步骤1: 检查必要文件
+    print("🔄 步骤1: 检查必要文件")
+    print("-" * 40)
+
+    essay_file = Path("input/essay.txt")
+    if not essay_file.exists():
+        print("❌ 未找到input/essay.txt文件")
+        print("💡 请先在input目录下创建essay.txt文件并添加文章内容")
+        return False
+
+    print(f"✅ 找到文章文件: {essay_file}")
+    print(f"📄 文章大小: {essay_file.stat().st_size} 字节")
+    print("✅ 步骤1完成\n")
+
+    # 步骤2: 清理目录（保留essay.txt）
+    print("🔄 步骤2: 清理目录")
+    print("-" * 40)
+
+    while True:
+        try:
+            answer = input("是否需要清空input目录（保留essay.txt）、slides和output目录中的所有文件? (y/n): ").lower().strip()
+            if answer in ['y', 'yes', '是']:
+                # 清理input目录（保留essay.txt）
+                clear_input_directory_except_essay()
+                # 清理slides和output目录
+                clear_directories()
+                break
+            elif answer in ['n', 'no', '否']:
+                print("跳过清理目录操作")
+                break
+            else:
+                print("请输入 y/yes/是 或 n/no/否")
+        except KeyboardInterrupt:
+            print("\n\n操作已取消")
+            return False
+
+    print("✅ 步骤2完成\n")
+
+    # 步骤3: 准备内容（prepare）
+    print("🔄 步骤3: 准备标题、封面和内容")
+    print("-" * 40)
+    success = prepare_title_and_cover_and_content()
+    if not success:
+        print("❌ 步骤3失败，工作流程终止")
+        return False
+    print("✅ 步骤3完成\n")
+
+    # 步骤4: 生成PPT（create-ppt）
+    print("🔄 步骤4: 生成PPTX文件")
+    print("-" * 40)
+    success = generate_pptx()
+    if not success:
+        print("❌ 步骤4失败，工作流程终止")
+        return False
+    print("✅ 步骤4完成\n")
+
+    # 步骤5: 检查操作系统和PDF状态
+    print("🔄 步骤5: 检查PDF文件状态")
+    print("-" * 40)
+    has_pdf, current_os = check_os_and_pdf_status()
+    if not has_pdf:
+        print("❌ 未检测到PDF文件，工作流程终止")
+        print("💡 请先创建PDF文件后重新运行")
+        return False
+    print("✅ 步骤5完成\n")
+
+    # 步骤6-9: 执行视频生成流程
+    print("🔄 步骤6-9: 执行视频生成流程")
+    print("-" * 40)
+
+    # 执行标准流程
+    steps = [
+        ("处理PDF文件", process_pdf),
+        ("处理PPT备注", process_ppt),
+        ("生成slide视频", lambda: generate_slide_videos(digital_human)),
+        ("批量处理slides", batch_process_slides)
+    ]
+
+    for i, (step_name, step_func) in enumerate(steps, 6):
+        print(f"🔄 步骤{i}: {step_name}")
+        print("-" * 40)
+
+        success = step_func()
+
+        if not success:
+            print(f"❌ 步骤{i}失败，工作流程终止")
+            return False
+
+        print(f"✅ 步骤{i}完成\n")
+
+    # 步骤10: 上传视频到B站（publish）
+    print("🔄 步骤10: 上传视频到B站")
+    print("-" * 40)
+
+    while True:
+        try:
+            answer = input("是否需要上传视频到B站? (y/n): ").lower().strip()
+            if answer in ['y', 'yes', '是']:
+                upload_success = upload_video_to_bilibili()
+                if not upload_success:
+                    print("⚠️ 视频上传失败，但视频文件已生成在output/result.mp4")
+                break
+            elif answer in ['n', 'no', '否']:
+                print("跳过视频上传操作")
+                break
+            else:
+                print("请输入 y/yes/是 或 n/no/否")
+        except KeyboardInterrupt:
+            print("\n\n操作已取消")
+            return False
+
+    print("🎉 完整自动化流程执行完成！")
+    print(f"📹 最终输出文件: output/result.mp4")
+    return True
 
 
 def upload_digital_human(character_name: str = "man"):
@@ -437,6 +913,8 @@ def main():
 使用示例:
   %(prog)s                          # 运行完整工作流程（使用默认数字人 man）
   %(prog)s --digital-human woman    # 运行完整工作流程（使用 woman 数字人）
+  %(prog)s --full                   # 运行完整自动化流程（从essay.txt到B站上传）
+  %(prog)s --full --digital-human woman  # 运行完整自动化流程（使用 woman 数字人）
   %(prog)s --clear                  # 仅清空slides和output目录
   %(prog)s --pdf                    # 仅处理PDF文件
   %(prog)s --ppt                    # 仅处理PPT备注提取
@@ -445,11 +923,12 @@ def main():
   %(prog)s --batch                  # 仅批量处理slides
   %(prog)s --upload man             # 上传指定数字人
   %(prog)s --upload all             # 批量上传所有数字人
-  %(prog)s --create-ppt             # 生成PPTX（默认6张幻灯片）
-  %(prog)s --create-ppt 8           # 生成PPTX（8张幻灯片）
+  %(prog)s --create-ppt             # 生成PPTX（自动从scripts.txt文件计算页数）
+  %(prog)s --prepare                # 准备标题和封面（基于essay.txt生成标题并创建封面，自动根据中文长度计算页数）
         """
     )
 
+    parser.add_argument("--full", action="store_true", help="运行完整自动化流程（从essay.txt到B站上传）")
     parser.add_argument("--clear", action="store_true", help="清空slides和output目录")
     parser.add_argument("--pdf", action="store_true", help="仅处理PDF文件")
     parser.add_argument("--ppt", action="store_true", help="仅处理PPT备注提取")
@@ -458,13 +937,17 @@ def main():
     parser.add_argument("--upload", metavar="NAME", help="上传指定数字人 (如: man, woman, all)")
     parser.add_argument("--digital-human", metavar="NAME", default="man",
                        help="指定使用的数字人 (默认: man)")
-    parser.add_argument("--create-ppt", nargs='?', const=6, type=int, metavar="NUM_CARDS",
-                       help="根据提示词文件生成PPTX (默认生成6张幻灯片，可指定数量)")
+    parser.add_argument("--create-ppt", action="store_true",
+                       help="根据提示词文件生成PPTX (自动从scripts.txt文件计算页数)")
+    parser.add_argument("--prepare", action="store_true",
+                       help="准备标题和封面（基于essay.txt生成标题并创建封面，自动根据中文长度计算页数）")
 
     args = parser.parse_args()
 
     # 根据参数执行相应功能
-    if args.clear:
+    if args.full:
+        return run_full_workflow(args.digital_human)
+    elif args.clear:
         return clear_directories()
     elif args.pdf:
         return process_pdf()
@@ -496,9 +979,10 @@ def main():
                 return False
         else:
             return upload_digital_human(args.upload)
-    elif args.create_ppt is not None:
-        # args.create_ppt 默认为6，用户可以指定数值
-        return generate_pptx(args.create_ppt)
+    elif args.create_ppt:
+        return generate_pptx()
+    elif args.prepare:
+        return prepare_title_and_cover_and_content()
     else:
         # 没有指定参数，运行完整工作流程
         return run_complete_workflow(args.digital_human)

@@ -222,3 +222,101 @@ print(response.text)
 ```
 
 ```
+
+请仿照一下内容，创建一个lib\glm_api.py 文件，提供基于prompt和用户输入返回大模型调用结果的功能
+```
+from openai import OpenAI
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+load_dotenv()
+
+def talk_to_ai(prompt_file,user_input):
+
+    client = OpenAI(
+        api_key=os.getenv("GLM_API_KEY") ,
+        base_url="https://open.bigmodel.cn/api/paas/v4/"
+    )
+
+    file_path = Path(prompt_file)
+        if not file_path.exists():
+            raise FileNotFoundError(f"提示词文件不存在: {file_path}")
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+
+            if not content:
+                raise ValueError(f"提示词文件为空: {file_path}")
+            completion = client.chat.completions.create(
+                model="GLM-4.5-Flash",
+                messages=[
+                    {"role": "system", "content": "你是一个聪明且富有创造力的小说作家"},
+                    {"role": "user", "content": "请你作为童话故事大王，写一篇短篇童话故事"}
+                ],
+                top_p=0.7,
+                temperature=0.9
+            )
+
+            return completion.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"读取提示词文件时发生错误: {str(e)}")
+
+    
+```
+请给@lib\runninghub_api.py添加一个create_cover(title)的功能，根据标题内容创建一个图片，并调用@lib\running_hub_api.py的查询、轮询、下载功能（参照已有的实现方式来做），将图片保存在input\cover.jpg(如果已存在则覆盖),然后更新assets\biliconfig.yaml中cover字段为"..\input\cover.jpg"。这个功能的调用方式参考下面curl的代码，其中webappid和apikey请在.env文件中cover_webappId和RUNNINGHUB_API_KEY读取，请用requests方式来实现：
+```
+curl --location --request POST 'https://www.runninghub.cn/task/openapi/quick-ai-app/run' \
+--header 'Host: www.runninghub.cn' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "webappId": "1959831828515467265",
+    "apiKey": "481e7653f5334058bd642478fdca8ddd",
+    "quickCreateCode": "006",
+    "nodeInfoList": [
+        {
+            "nodeId": "889",
+            "nodeName": "EmptyLatentImage",
+            "fieldName": "batch_size",
+            "fieldType": "INT",
+            "fieldValue": "1",
+            "description": "生成张数"
+        },
+        {
+            "nodeId": "887",
+            "nodeName": "ImpactSwitch",
+            "fieldName": "select",
+            "fieldType": "SWITCH",
+            "fieldValue": "2",
+            "description": "设置比例"
+        },
+        {
+            "nodeId": "923",
+            "nodeName": "easy anythingIndexSwitch",
+            "fieldName": "index",
+            "fieldType": "SWITCH",
+            "fieldValue": "1",
+            "description": "文本输入方式"
+        },
+        {
+            "nodeId": "876",
+            "nodeName": "JjkText",
+            "fieldName": "text",
+            "fieldType": "STRING",
+            "fieldValue": "为一个视频制作封面,视频的标题为：{title},背景图案显示标题内容相关的画面，前景是一个45度旋转的黄色矩形框，里面写着{title}"
+        }
+    ]
+}'
+```
+给@lib\glm_api.py中的talk_to_ai功能添加一个model参数，默认是GLM-4.5-Flash
+给@main.py添加一个命令行功能prepare，功能如下：
+使用@lib\glm_api.py中的talk_to_ai功能，使用assets\gen_title_prompt.prompt
+作为prompt，input\essay.txt作为用户输入，获取标题，并将标题内容写入input\
+title.txt,并调用@lib_runninghub_api.py的create_cover(title)功能创建封面。
+
+将@main.py的prepare_title_and_cover改名为prepare_title_and_cover_and_content,增加一个page参数
+在生成title和cover以后，增加以下功能：
+1、使用@lib\glm_api.py中的talk_to_ai功能，使用assets\split_content.prompt作为prompt，将参数page填入split_content.prompt中。
+input\essay.txt作为用户输入，将一篇长的文章拆分成多页内容，并将内容写入input\prompt.txt
+2、使用@lib\glm_api.py中的talk_to_ai功能，指定模型使用glm-4.6，使用assets\gen_scripts.prompt作为prompt，
+input\prompt.txt作为用户输入，获得每一页的讲稿，并将内容写入input\scripts.txt

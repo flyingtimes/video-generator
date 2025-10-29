@@ -557,6 +557,259 @@ class RunningHubAPI:
         print(f"❌ 任务失败，已达到最大重试次数 ({max_retries})")
         return False
 
+    def create_cover(self, title: str) -> bool:
+        """
+        根据标题创建封面图片
+
+        Args:
+            title: 视频标题
+
+        Returns:
+            bool: 创建成功返回True，失败返回False
+        """
+        import time
+
+        print(f"\n{'='*50}")
+        print(f"开始创建封面图片: {title}")
+        print('='*50)
+
+        try:
+            # 获取cover webappId
+            cover_webapp_id = os.getenv('cover_webappId')
+            if not cover_webapp_id:
+                print("❌ 未找到cover_webappId，请在.env文件中配置")
+                return False
+
+            # 构建请求数据
+            data = {
+                "webappId": cover_webapp_id,
+                "apiKey": self.api_key,
+                "quickCreateCode": "006",
+                "nodeInfoList": [
+                    {
+                        "nodeId": "889",
+                        "nodeName": "EmptyLatentImage",
+                        "fieldName": "batch_size",
+                        "fieldType": "INT",
+                        "fieldValue": "1",
+                        "description": "生成张数"
+                    },
+                    {
+                        "nodeId": "887",
+                        "nodeName": "ImpactSwitch",
+                        "fieldName": "select",
+                        "fieldType": "SWITCH",
+                        "fieldValue": "5",
+                        "description": "设置比例"
+                    },
+                    {
+                        "nodeId": "923",
+                        "nodeName": "easy anythingIndexSwitch",
+                        "fieldName": "index",
+                        "fieldType": "SWITCH",
+                        "fieldValue": "1",
+                        "description": "文本输入方式"
+                    },
+                    {
+                        "nodeId": "876",
+                        "nodeName": "JjkText",
+                        "fieldName": "text",
+                        "fieldType": "STRING",
+                        "fieldValue": f"为一个视频制作封面,视频的标题为：{title},背景图案显示标题内容相关的画面，前景是一个45度旋转的黄色矩形框,矩形框占据画面主要位置尽量大一些，里面写着{title}"
+                    }
+                ]
+            }
+
+            print(f"正在生成封面图片...")
+            print(f"标题: {title}")
+            print(f"WebApp ID: {cover_webapp_id}")
+
+            # 发送请求
+            response = requests.post(
+                f"{self.base_url}/task/openapi/quick-ai-app/run",
+                headers={'Content-Type': 'application/json'},
+                json=data
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('code') == 0:
+                    task_id = result.get('data', {}).get('taskId')
+                    print(f"✅ 封面生成任务创建成功: {task_id}")
+
+                    # 轮询任务状态并下载图片
+                    success = self._poll_and_download_cover(task_id, title)
+                    if success:
+                        # 更新biliconfig.yaml
+                        self._update_biliconfig_cover()
+                        print(f"✅ 封面创建完成: input/cover.jpg")
+                        return True
+                    else:
+                        print(f"❌ 封面下载失败")
+                        return False
+                else:
+                    print(f"❌ 生成失败: {result.get('msg', '未知错误')}")
+                    return False
+            else:
+                print(f"❌ 请求失败，状态码: {response.status_code}")
+                print(f"响应内容: {response.text}")
+                return False
+
+        except Exception as e:
+            print(f"❌ 创建封面时发生异常: {str(e)}")
+            return False
+
+    def _poll_and_download_cover(self, task_id: str, title: str) -> bool:
+        """
+        轮询封面生成任务状态并下载图片
+
+        Args:
+            task_id: 任务ID
+            title: 标题（用于日志）
+
+        Returns:
+            bool: 下载成功返回True，失败返回False
+        """
+        import time
+
+        max_attempts = 60  # 最多等待30分钟
+        retry_count = 0
+        max_retries = 3
+
+        while retry_count < max_retries:
+            print(f"\n🔄 检查封面任务状态 (尝试 {retry_count + 1}/{max_retries})")
+
+            for attempt in range(max_attempts):
+                print(f"⏳ 等待封面生成完成... ({attempt + 1}/{max_attempts})")
+                time.sleep(30)  # 等待30秒
+
+                status_result = self.check_task_status(task_id)
+                if not status_result:
+                    print(f"❌ 查询任务状态失败，继续等待...")
+                    continue
+
+                code = status_result.get('code', -1)
+                msg = status_result.get('msg', '')
+                print(f"⏳ ({attempt + 1}/{max_attempts})，📊 任务状态: {msg} ({code})")
+
+                if code == 0 and msg == 'success':
+                    # 任务成功，获取下载链接
+                    data_list = status_result.get('data', [])
+                    if data_list:
+                        file_url = data_list[0].get('fileUrl', '')
+                        if file_url:
+                            print(f"🎨 封面图片生成成功，开始下载...")
+                            success = self._download_cover_image(file_url)
+                            if success:
+                                return True
+                            else:
+                                print(f"❌ 封面图片下载失败")
+                                return False
+                        else:
+                            print(f"❌ 未找到下载链接")
+                            return False
+                    else:
+                        print(f"❌ 响应数据为空")
+                        return False
+
+                elif msg in ['APIKEY_TASK_IS_RUNNING', 'APIKEY_TASK_IS_QUEUED']:
+                    # 任务还在运行或排队，继续等待
+                    print(f"🔄 任务{msg}，继续等待...")
+                    continue
+
+                else:
+                    # 任务失败或其他错误
+                    print(f"❌ 任务执行失败: {msg} (code: {code})")
+                    break
+
+            # 如果到这里说明任务超时或失败，尝试重新执行
+            retry_count += 1
+            if retry_count < max_retries:
+                print(f"🔄 任务失败，重新尝试... ({retry_count}/{max_retries})")
+                return self.create_cover(title)  # 重新创建任务
+
+        # 超过最大重试次数
+        print(f"❌ 封面生成任务失败，已达到最大重试次数 ({max_retries})")
+        return False
+
+    def _download_cover_image(self, file_url: str) -> bool:
+        """
+        下载封面图片
+
+        Args:
+            file_url: 图片文件URL
+
+        Returns:
+            bool: 下载成功返回True，失败返回False
+        """
+        try:
+            print(f"正在下载封面图片: {file_url}")
+
+            response = requests.get(file_url, stream=True, timeout=30)
+
+            if response.status_code == 200:
+                # 确保input目录存在
+                os.makedirs("input", exist_ok=True)
+
+                output_path = "input/cover.jpg"
+                with open(output_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                print(f"✅ 封面图片下载成功: {output_path}")
+                return True
+            else:
+                print(f"❌ 下载失败，状态码: {response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"❌ 下载封面图片时发生异常: {str(e)}")
+            return False
+
+    def _update_biliconfig_cover(self) -> bool:
+        """
+        更新assets/biliconfig.yaml中的cover字段
+
+        Returns:
+            bool: 更新成功返回True，失败返回False
+        """
+        try:
+            config_path = "assets/biliconfig.yaml"
+
+            if not os.path.exists(config_path):
+                print(f"❌ 配置文件不存在: {config_path}")
+                return False
+
+            # 读取现有配置
+            with open(config_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            # 查找并替换cover字段
+            updated = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith('cover:'):
+                    lines[i] = 'cover: "..\\\\input\\\\cover.jpg"\n'
+                    updated = True
+                    break
+
+            # 如果没有找到cover字段，在line字段后添加
+            if not updated:
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('line:'):
+                        lines.insert(i + 1, 'cover: "..\\\\input\\\\cover.jpg"\n')
+                        updated = True
+                        break
+
+            # 写回文件
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.writelines(lines)
+
+            print(f"✅ 已更新 {config_path} 中的cover字段")
+            return True
+
+        except Exception as e:
+            print(f"❌ 更新配置文件失败: {str(e)}")
+            return False
+
 
 def get_webapp_id(mode: str) -> str:
     """

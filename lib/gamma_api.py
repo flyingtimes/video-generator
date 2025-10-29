@@ -63,7 +63,7 @@ class GammaAPI:
         except Exception as e:
             raise Exception(f"读取提示词文件时发生错误: {str(e)}")
 
-    def _add_notes_to_pptx(self, pptx_path: str, prompt_file: str = "input/prompt.txt") -> bool:
+    def _add_notes_to_pptx(self, pptx_path: str, prompt_file: str = "input/scripts.txt") -> bool:
         """
         为下载的PPTX文件添加备注
 
@@ -245,8 +245,8 @@ class GammaAPI:
             },
             "imageOptions": {
                 "source": "aiGenerated",
-                "model": "gemini-2.5-flash-image",
-                "style": "插画风格"
+                "model": "imagen-3-pro",
+                "style": "现实风格"
             },
             "cardOptions": {"dimensions": "16x9"},
             "sharingOptions": {
@@ -257,7 +257,7 @@ class GammaAPI:
 
         # 合并用户提供的参数
         payload = {**default_config, **kwargs}
-
+        print(payload)
         # 确保必填字段存在
         if "inputText" not in payload or not payload["inputText"]:
             raise ValueError("inputText是必填字段")
@@ -289,7 +289,7 @@ class GammaAPI:
             # 如果是PPTX文件，添加备注
             if output_path.lower().endswith('.pptx'):
                 print("📝 开始为PPTX文件添加备注...")
-                success = self._add_notes_to_pptx(output_path, prompt_file)
+                success = self._add_notes_to_pptx(output_path)
                 if success:
                     print("✅ 备注添加完成")
                 else:
@@ -449,9 +449,8 @@ class GammaAPI:
             output_path = Path(output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
 
-            # 生成输出文件名
-            timestamp = int(time.time())
-            output_filename = f"generated_ppt_{timestamp}.pptx"
+            # 生成输出文件名（使用固定名称以便后续流程查找）
+            output_filename = "generated.pptx"
             full_output_path = output_path / output_filename
 
             print("📥 从Gamma导出PPTX文件...")

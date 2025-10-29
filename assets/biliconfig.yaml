@@ -5,7 +5,7 @@ streamers:
     copyright: 1
     source: 转载来源
     tid: 171 # 投稿分区
-    cover: "" # 视频封面
+cover: "..\\input\\cover.jpg"
     title: 未来投资方向深度报告：凯茜·伍德（Cathie Wood）的颠覆性创新洞察
     desc_format_id: 0
     desc: huanyuan-world-mirror
