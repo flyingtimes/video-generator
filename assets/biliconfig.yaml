@@ -1,11 +1,11 @@
 line: cs-cnbd
 limit: 1
 streamers:
-  ..\output\resu*.mp4:
+  output/result.mp4:
     copyright: 1
     source: 转载来源
     tid: 171 # 投稿分区
-cover: "..\\input\\cover.jpg"
+    cover: "input/cover.jpg"
     title: 五大平台融合，引爆未来增长
     desc_format_id: 0
     desc: huanyuan-world-mirror

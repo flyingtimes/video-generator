@@ -8,6 +8,7 @@ import sys
 import os
 import shutil
 import glob
+import subprocess
 from pathlib import Path
 import argparse
 
@@ -672,7 +673,7 @@ def check_os_and_pdf_status():
 
 
 def upload_video_to_bilibili():
-    """上传视频到B站"""
+    """上传视频到B站，如果失败则尝试renew后重试"""
     print("📺 开始上传视频到B站")
     print("-" * 40)
 
@@ -699,14 +700,17 @@ def upload_video_to_bilibili():
             print(f"❌ biliup配置文件不存在: {config_file}")
             return False
 
-        # 构建上传命令
-        upload_cmd = [str(biliup_exe), "upload", "-c", str(config_file)]
+        # 尝试上传的函数
+        def attempt_upload():
+            upload_cmd = [str(biliup_exe), "upload", "-c", str(config_file)]
+            print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
+            print("⏳ 上传过程可能需要较长时间，请耐心等待...")
 
-        print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
-        print("⏳ 上传过程可能需要较长时间，请耐心等待...")
+            result = subprocess.run(upload_cmd, cwd=project_root, capture_output=True, text=True)
+            return result
 
-        # 执行上传命令
-        result = subprocess.run(upload_cmd, cwd=project_root, capture_output=True, text=True)
+        # 第一次尝试上传
+        result = attempt_upload()
 
         if result.returncode == 0:
             print("✅ 视频上传成功！")
@@ -719,7 +723,51 @@ def upload_video_to_bilibili():
             if result.stderr:
                 print("❌ 错误信息:")
                 print(result.stderr)
-            return False
+
+            # 检查错误信息是否包含登录相关的错误
+            error_output = (result.stderr or "").lower() + (result.stdout or "").lower()
+            login_error_keywords = ["登录", "login", "认证", "auth", "cookie", "session", "token", "过期", "expire"]
+
+            if any(keyword in error_output for keyword in login_error_keywords):
+                print("🔄 检测到可能的登录问题，尝试执行renew刷新登录信息...")
+
+                # 执行renew命令
+                renew_cmd = [str(biliup_exe), "renew", "-c", str(config_file)]
+                print(f"🔄 执行renew命令: {' '.join(renew_cmd)}")
+
+                renew_result = subprocess.run(renew_cmd, cwd=project_root, capture_output=True, text=True)
+
+                if renew_result.returncode == 0:
+                    print("✅ renew执行成功，登录信息已刷新")
+                    if renew_result.stdout:
+                        print("📋 renew输出:")
+                        print(renew_result.stdout)
+
+                    # renew成功后重新尝试上传
+                    print("🔄 重新尝试上传视频...")
+                    retry_result = attempt_upload()
+
+                    if retry_result.returncode == 0:
+                        print("✅ renew后视频上传成功！")
+                        if retry_result.stdout:
+                            print("📋 重试上传输出:")
+                            print(retry_result.stdout)
+                        return True
+                    else:
+                        print("❌ renew后重新上传仍然失败")
+                        if retry_result.stderr:
+                            print("❌ 重试错误信息:")
+                            print(retry_result.stderr)
+                        return False
+                else:
+                    print("❌ renew执行失败")
+                    if renew_result.stderr:
+                        print("❌ renew错误信息:")
+                        print(renew_result.stderr)
+                    return False
+            else:
+                print("❌ 未检测到登录相关错误，不执行renew")
+                return False
 
     except Exception as e:
         print(f"❌ 上传过程中发生错误: {str(e)}")
@@ -955,6 +1003,7 @@ def main():
   %(prog)s --upload all             # 批量上传所有数字人
   %(prog)s --create-ppt             # 生成PPTX（自动从scripts.txt文件计算页数）
   %(prog)s --prepare                # 准备标题和封面（基于essay.txt生成标题并创建封面，自动根据中文长度计算页数）
+  %(prog)s --publish                # 上传视频到B站（需要output/result.mp4文件存在）
         """
     )
 
@@ -971,6 +1020,8 @@ def main():
                        help="根据提示词文件生成PPTX (自动从scripts.txt文件计算页数)")
     parser.add_argument("--prepare", action="store_true",
                        help="准备标题和封面（基于essay.txt生成标题并创建封面，自动根据中文长度计算页数）")
+    parser.add_argument("--publish", action="store_true",
+                       help="上传视频到B站（需要output/result.mp4文件存在）")
 
     args = parser.parse_args()
 
@@ -1013,6 +1064,8 @@ def main():
         return generate_pptx()
     elif args.prepare:
         return prepare_title_and_cover_and_content()
+    elif args.publish:
+        return upload_video_to_bilibili()
     else:
         # 没有指定参数，运行完整工作流程
         return run_complete_workflow(args.digital_human)
