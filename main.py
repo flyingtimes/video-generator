@@ -328,10 +328,6 @@ def generate_pptx(num_cards: int = 6):
                 "audience": "general",
                 "language": "zh-cn"
             },
-            imageOptions={
-                "source": "aiGenerated",
-                "style": "现代简约"
-            },
             cardOptions={"dimensions": "16x9"}
         )
 

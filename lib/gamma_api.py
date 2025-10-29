@@ -245,7 +245,7 @@ class GammaAPI:
             },
             "imageOptions": {
                 "source": "aiGenerated",
-                "model": "",
+                "model": "gemini-2.5-flash-image",
                 "style": "插画风格"
             },
             "cardOptions": {"dimensions": "16x9"},
