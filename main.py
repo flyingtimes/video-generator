@@ -224,9 +224,9 @@ def generate_slide_videos(digital_human: str = "man"):
 
             # 检查对应视频文件是否已存在
             if is_full_mode:
-                mp4_file_path = f"output/combine_{slide_num}.mp4"
+                mp4_file_path = Path("output") / f"combine_{slide_num}.mp4"
             else:
-                mp4_file_path = f"slides/{slide_num}.mp4"
+                mp4_file_path = Path("slides") / f"{slide_num}.mp4"
 
             if os.path.exists(mp4_file_path):
                 print(f"⏭️ 视频文件已存在，跳过: {mp4_file_path}")
@@ -409,8 +409,12 @@ def generate_pptx():
 
 @execution_time_logger("准备标题、封面和内容")
 @step_logger("准备标题、封面和内容")
-def prepare_title_and_cover_and_content():
-    """准备标题、封面和内容：生成标题、创建封面图片、拆分内容并生成讲稿"""
+def prepare_title_and_cover_and_content(config_file_path=None):
+    """准备标题、封面和内容：生成标题、创建封面图片、拆分内容并生成讲稿
+
+    Args:
+        config_file_path: 配置文件路径，如果为None则使用默认路径
+    """
     print("🔄 准备标题、封面和内容")
     print("-" * 40)
 
@@ -481,7 +485,11 @@ def prepare_title_and_cover_and_content():
         # 更新 biliconfig.yaml 文件中的 title 和 desc 字段
         print("🔄 正在更新 biliconfig.yaml 配置文件...")
         try:
-            config_file = Path("assets/biliconfig.yaml")
+            # 使用传入的配置文件路径，如果没有则使用默认路径
+            if config_file_path:
+                config_file = Path(config_file_path)
+            else:
+                config_file = Path("assets/biliconfig.yaml")
             if config_file.exists():
                 with open(config_file, 'r', encoding='utf-8') as f:
                     config_content = f.read()
@@ -737,6 +745,7 @@ def upload_video_to_bilibili():
                 f.write(processed_config)
 
             try:
+
                 upload_cmd = [str(biliup_exe), "upload", "-c", str(temp_config_file)]
                 print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
                 print("⏳ 上传过程可能需要较长时间，请耐心等待...")
@@ -815,7 +824,7 @@ def upload_video_to_bilibili():
 
 @execution_time_logger("完整自动化流程")
 @step_logger("完整自动化流程")
-def run_full_workflow(digital_human: str = "man"):
+def run_full_workflow(digital_human: str = "man", no_confirm: bool = False):
     """运行完整的自动化流程"""
     print("🚀 开始完整自动化流程")
     print("=" * 60)
@@ -838,23 +847,31 @@ def run_full_workflow(digital_human: str = "man"):
     print("🔄 步骤2: 清理目录")
     print("-" * 40)
 
-    while True:
-        try:
-            answer = input("是否需要清空input目录（保留essay.txt）、slides和output目录中的所有文件? (y/n): ").lower().strip()
-            if answer in ['y', 'yes', '是']:
-                # 清理input目录（保留essay.txt）
-                clear_input_directory_except_essay()
-                # 清理slides和output目录
-                clear_directories()
-                break
-            elif answer in ['n', 'no', '否']:
-                print("跳过清理目录操作")
-                break
-            else:
-                print("请输入 y/yes/是 或 n/no/否")
-        except KeyboardInterrupt:
-            print("\n\n操作已取消")
-            return False
+    if no_confirm:
+        # 跳过确认，直接执行清理
+        print("🗂️  自动清理目录...")
+        # 清理input目录（保留essay.txt）
+        clear_input_directory_except_essay()
+        # 清理slides和output目录
+        clear_directories()
+    else:
+        while True:
+            try:
+                answer = input("是否需要清空input目录（保留essay.txt）、slides和output目录中的所有文件? (y/n): ").lower().strip()
+                if answer in ['y', 'yes', '是']:
+                    # 清理input目录（保留essay.txt）
+                    clear_input_directory_except_essay()
+                    # 清理slides和output目录
+                    clear_directories()
+                    break
+                elif answer in ['n', 'no', '否']:
+                    print("跳过清理目录操作")
+                    break
+                else:
+                    print("请输入 y/yes/是 或 n/no/否")
+            except KeyboardInterrupt:
+                print("\n\n操作已取消")
+                return False
 
     print("✅ 步骤2完成\n")
 
@@ -1061,12 +1078,14 @@ def main():
                        help="准备标题和封面（基于essay.txt生成标题并创建封面，自动根据中文长度计算页数）")
     parser.add_argument("--publish", action="store_true",
                        help="上传视频到B站（需要output/result.mp4文件存在）")
+    parser.add_argument("--no-confirm", action="store_true",
+                       help="跳过所有确认提示，自动选择默认选项")
 
     args = parser.parse_args()
 
     # 根据参数执行相应功能
     if args.full:
-        return run_full_workflow(args.digital_human)
+        return run_full_workflow(args.digital_human, args.no_confirm)
     elif args.clear:
         return clear_directories()
     elif args.pdf:

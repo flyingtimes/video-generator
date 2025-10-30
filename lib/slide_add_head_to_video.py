@@ -52,6 +52,12 @@ def compose_slide_with_video(
             raise FileNotFoundError(f"输入文件不存在: {file_path}")
 
     try:
+        # 确保使用绝对路径和正确的路径格式
+        slide_image = str(Path(slide_image).absolute())
+        video_file = str(Path(video_file).absolute())
+        mask_path = str(Path(mask_path).absolute())
+        output_file = str(Path(output_file).absolute())
+
         # 使用ffmpeg-python构建流水线，对应命令行参数：
         # '-i', slide_image,
         # '-i', video_file,
@@ -97,7 +103,7 @@ def compose_slide_with_video(
         # 运行
         ffmpeg.run(out, overwrite_output=True, capture_stdout=True, capture_stderr=True)
 
-        print(f"✅ 视频合成完成: {output_file}")
+        print(f"视频合成完成: {output_file}")
         return output_file
 
     except ffmpeg.Error as e:
@@ -183,8 +189,8 @@ def find_slide_pairs() -> List[Tuple[int, str, str]]:
         base_name = Path(png_file).stem
         if base_name.isdigit():
             num = int(base_name)
-            mp4_file = f"slides/{num}.mp4"
-            output_file = f"output/combine_{num}.mp4"
+            mp4_file = Path("slides") / f"{num}.mp4"
+            output_file = Path("output") / f"combine_{num}.mp4"
 
             # 检查对应的mp4文件是否存在
             if Path(mp4_file).exists():
@@ -224,7 +230,7 @@ def process_slide_pairs(pairs: List[Tuple[int, str, str]]) -> List[str]:
     processed_files = []
 
     for num, png_file, mp4_file in pairs:
-        output_file = f"output/combine_{num}.mp4"
+        output_file = Path("output") / f"combine_{num}.mp4"
 
         # 检查输出文件是否已存在
         if Path(output_file).exists():

@@ -275,7 +275,7 @@ def process_pdf_to_slides(pdf_path: str, target_size: Tuple[int, int] = (1920, 1
         converted_files = []
 
         for page_num in range(page_count):
-            output_path = f"slides/{page_num + 1}.png"
+            output_path = Path("slides") / f"{page_num + 1}.png"
 
             print(f"🔄 转换第 {page_num + 1}/{page_count} 页...")
 

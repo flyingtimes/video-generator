@@ -5,16 +5,16 @@ streamers:
     copyright: 1
     source: 转载来源
     tid: 171 # 投稿分区
-    cover: "input\\cover.jpg"
-    title: 五大平台融合，引爆未来增长
+    cover: "input/cover.jpg"
+    title: 你想知道马斯克的超级学习法是什么吗？
     desc_format_id: 0
-    desc: huanyuan-world-mirror
+    desc: 学习技能提升
     dolby: 1 # 杜比音效
     lossless_music: 1 # Hi-Res
     dynamic: ""
     subtitle:
       open: 0
       lan: ""
-    tag: "海外投资"
+    tag: "学习效率"
     dtime: ~
     open_subtitle: false

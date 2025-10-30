@@ -787,15 +787,18 @@ class RunningHubAPI:
             updated = False
             for i, line in enumerate(lines):
                 if line.strip().startswith('cover:'):
-                    lines[i] = 'cover: "..\\\\input\\\\cover.jpg"\n'
+                    # 保持原有缩进，只替换内容
+                    indent = len(line) - len(line.lstrip())
+                    lines[i] = ' ' * indent + 'cover: "input/cover.jpg"\n'
                     updated = True
                     break
 
-            # 如果没有找到cover字段，在line字段后添加
+            # 如果没有找到cover字段，在tid字段后添加（保持相同缩进级别）
             if not updated:
                 for i, line in enumerate(lines):
-                    if line.strip().startswith('line:'):
-                        lines.insert(i + 1, 'cover: "..\\\\input\\\\cover.jpg"\n')
+                    if line.strip().startswith('tid:'):
+                        indent = len(line) - len(line.lstrip())
+                        lines.insert(i + 1, ' ' * indent + 'cover: "input/cover.jpg"\n')
                         updated = True
                         break
 
