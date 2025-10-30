@@ -6,6 +6,12 @@
 
 import sys
 import os
+
+# 设置控制台输出编码为UTF-8
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
 import shutil
 import glob
 import subprocess
@@ -700,14 +706,47 @@ def upload_video_to_bilibili():
             print(f"❌ biliup配置文件不存在: {config_file}")
             return False
 
+        # 创建跨平台路径处理函数
+        def process_config_paths(config_content):
+            """处理配置文件中的路径，使其跨平台兼容"""
+            import re
+            import platform
+
+            # 将Windows路径转换为当前系统兼容的路径
+            # 替换反斜杠为正斜杠（在非Windows系统上）
+            if platform.system() != 'Windows':
+                # 替换双反斜杠为正斜杠
+                config_content = re.sub(r'\\\\', '/', config_content)
+                # 替换单反斜杠为正斜杠
+                config_content = re.sub(r'(?<!\\)\\(?!\\)', '/', config_content)
+
+            return config_content
+
         # 尝试上传的函数
         def attempt_upload():
-            upload_cmd = [str(biliup_exe), "upload", "-c", str(config_file)]
-            print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
-            print("⏳ 上传过程可能需要较长时间，请耐心等待...")
+            # 读取并处理配置文件
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config_content = f.read()
 
-            result = subprocess.run(upload_cmd, cwd=project_root, capture_output=True, text=True)
-            return result
+            # 处理路径兼容性
+            processed_config = process_config_paths(config_content)
+
+            # 创建临时配置文件
+            temp_config_file = config_file.with_suffix('.tmp.yaml')
+            with open(temp_config_file, 'w', encoding='utf-8') as f:
+                f.write(processed_config)
+
+            try:
+                upload_cmd = [str(biliup_exe), "upload", "-c", str(temp_config_file)]
+                print(f"🚀 执行上传命令: {' '.join(upload_cmd)}")
+                print("⏳ 上传过程可能需要较长时间，请耐心等待...")
+
+                result = subprocess.run(upload_cmd, cwd=project_root, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+                return result
+            finally:
+                # 清理临时文件
+                if temp_config_file.exists():
+                    temp_config_file.unlink()
 
         # 第一次尝试上传
         result = attempt_upload()
@@ -732,10 +771,10 @@ def upload_video_to_bilibili():
                 print("🔄 检测到可能的登录问题，尝试执行renew刷新登录信息...")
 
                 # 执行renew命令
-                renew_cmd = [str(biliup_exe), "renew", "-c", str(config_file)]
+                renew_cmd = [str(biliup_exe), "renew"]
                 print(f"🔄 执行renew命令: {' '.join(renew_cmd)}")
 
-                renew_result = subprocess.run(renew_cmd, cwd=project_root, capture_output=True, text=True)
+                renew_result = subprocess.run(renew_cmd, cwd=project_root, capture_output=True, text=True, encoding='utf-8', errors='ignore')
 
                 if renew_result.returncode == 0:
                     print("✅ renew执行成功，登录信息已刷新")
